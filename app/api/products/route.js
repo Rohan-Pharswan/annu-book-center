@@ -51,6 +51,10 @@ export const POST = withErrorHandling(async (request) => {
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
   const body = await request.json();
+  if (body.image && !body.images) {
+    body.images = [body.image];
+    delete body.image;
+  }
   const parsed = validate(productSchema, body);
   if (!parsed.ok) return NextResponse.json({ errors: parsed.errors }, { status: 400 });
 
