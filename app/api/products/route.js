@@ -51,10 +51,18 @@ export const POST = withErrorHandling(async (request) => {
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
   const body = await request.json();
+  console.log("PRODUCT BODY:", body);
+
   if (body.image && !body.images) {
     body.images = [body.image];
-    delete body.image;
   }
+
+  if (!Array.isArray(body.images)) {
+    return NextResponse.json({ errors: ["Images must be an array"] }, { status: 400 });
+  }
+
+  delete body.image;
+
   const parsed = validate(productSchema, body);
   if (!parsed.ok) return NextResponse.json({ errors: parsed.errors }, { status: 400 });
 

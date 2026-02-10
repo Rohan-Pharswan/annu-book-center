@@ -10,7 +10,7 @@ const initial = {
   price: 0,
   stock: 0,
   description: "",
-  images: [""]
+  images: []
 };
 
 export default function AdminProductsPage() {
@@ -41,14 +41,29 @@ export default function AdminProductsPage() {
 
   async function createProduct(e) {
     e.preventDefault();
+    const normalizedImage = typeof imageData === "string" ? imageData.trim() : "";
+    const normalizedImages = Array.isArray(form.images)
+      ? form.images.filter((img) => typeof img === "string" && img.trim().length > 0)
+      : [];
+
+    const payload = {
+      ...form,
+      price: Number(form.price),
+      stock: Number(form.stock)
+    };
+
+    if (normalizedImage) {
+      payload.image = normalizedImage;
+    } else if (normalizedImages.length > 0) {
+      payload.images = normalizedImages;
+    } else {
+      delete payload.images;
+    }
+
     await fetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        price: Number(form.price),
-        stock: Number(form.stock)
-      })
+      body: JSON.stringify(payload)
     });
     setForm(initial);
     setImageData("");
