@@ -46,8 +46,10 @@ export default function HomePage() {
 
   return (
     <section>
-      <h1>Annu Book Store</h1>
-      <p className="muted">Books, stationery, and school essentials for local customers.</p>
+      <div className="hero">
+        <h1>Annu Book Store</h1>
+        <p className="muted">Books, stationery, and school essentials for local customers.</p>
+      </div>
 
       <div className="filters">
         <input
@@ -98,4 +100,3 @@ export default function HomePage() {
     </section>
   );
 }
-

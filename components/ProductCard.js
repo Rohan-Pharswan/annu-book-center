@@ -5,7 +5,7 @@ import Link from "next/link";
 export default function ProductCard({ product, onWishlist, onCart }) {
   return (
     <article className="card">
-      <img src={product.images?.[0]} alt={product.name} className="card-image" />
+      <img src={product.images?.[0]} alt={product.name} className="card-image" loading="lazy" />
       <div className="card-body">
         <p className="muted">{product.category}</p>
         <h3>{product.name}</h3>
@@ -36,4 +36,3 @@ export default function ProductCard({ product, onWishlist, onCart }) {
     </article>
   );
 }
-
