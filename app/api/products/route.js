@@ -7,6 +7,25 @@ import Product from "@/models/Product";
 import Discount from "@/models/Discount";
 import { applyPercentage } from "@/lib/pricing";
 
+function normalizeImageUrl(value) {
+  if (typeof value !== "string") return "";
+  let text = value.trim();
+  if (!text) return "";
+
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    text = text.slice(1, -1).trim();
+  }
+
+  if (!text) return "";
+  if (!/^https?:\/\//i.test(text) && /^[\w.-]+\.[A-Za-z]{2,}(\/.*)?$/.test(text)) {
+    text = `https://${text}`;
+  }
+  return text;
+}
+
 export const GET = withErrorHandling(async (request) => {
   await connectDB();
   const { searchParams } = new URL(request.url);
@@ -51,13 +70,12 @@ export const POST = withErrorHandling(async (request) => {
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
   const body = await request.json();
-  console.log("PRODUCT BODY:", body);
+  const imageFromBody = normalizeImageUrl(body.image);
+  const normalizedImages = Array.isArray(body.images) ? body.images.map((img) => normalizeImageUrl(img)).filter(Boolean) : [];
 
-  if (body.image && !body.images) {
-    body.images = [body.image];
-  }
+  body.images = normalizedImages.length > 0 ? normalizedImages : imageFromBody ? [imageFromBody] : [];
 
-  if (!Array.isArray(body.images)) {
+  if (body.images.length === 0) {
     return NextResponse.json({ errors: ["Images must be an array"] }, { status: 400 });
   }
 

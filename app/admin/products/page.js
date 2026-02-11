@@ -13,6 +13,26 @@ const initial = {
   images: []
 };
 
+function normalizeImageInput(value) {
+  if (typeof value !== "string") return "";
+  let text = value.trim();
+  if (!text) return "";
+
+  // Accept pasted values like "https://example.com/a.jpg".
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    text = text.slice(1, -1).trim();
+  }
+
+  if (!text) return "";
+  if (text.startsWith("data:image/")) return text;
+  if (/^https?:\/\//i.test(text)) return text;
+  if (/^[\w.-]+\.[A-Za-z]{2,}(\/.*)?$/.test(text)) return `https://${text}`;
+  return text;
+}
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(initial);
@@ -29,21 +49,35 @@ export default function AdminProductsPage() {
   }, []);
 
   async function uploadImage() {
-    if (!imageData) return;
+    const normalizedImage = normalizeImageInput(imageData);
+    if (!normalizedImage) return;
+
+    // A direct HTTP(S) URL is already usable as product image.
+    if (/^https?:\/\//i.test(normalizedImage)) {
+      setForm((prev) => ({ ...prev, images: [normalizedImage] }));
+      setImageData(normalizedImage);
+      return;
+    }
+
     const res = await fetch("/api/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: imageData })
+      body: JSON.stringify({ image: normalizedImage })
     });
     const data = await res.json();
-    if (data.imageUrl) setForm((prev) => ({ ...prev, images: [data.imageUrl] }));
+    if (data.imageUrl) {
+      setForm((prev) => ({ ...prev, images: [data.imageUrl] }));
+      setImageData(data.imageUrl);
+    }
   }
 
   async function createProduct(e) {
     e.preventDefault();
-    const normalizedImage = typeof imageData === "string" ? imageData.trim() : "";
+    const normalizedImage = normalizeImageInput(imageData);
     const normalizedImages = Array.isArray(form.images)
-      ? form.images.filter((img) => typeof img === "string" && img.trim().length > 0)
+      ? form.images
+          .map((img) => normalizeImageInput(img))
+          .filter((img) => typeof img === "string" && img.trim().length > 0)
       : [];
 
     const payload = {
@@ -52,13 +86,7 @@ export default function AdminProductsPage() {
       stock: Number(form.stock)
     };
 
-    if (normalizedImage) {
-      payload.image = normalizedImage;
-    } else if (normalizedImages.length > 0) {
-      payload.images = normalizedImages;
-    } else {
-      delete payload.images;
-    }
+    payload.images = normalizedImages.length > 0 ? normalizedImages : normalizedImage ? [normalizedImage] : [];
 
     await fetch("/api/products", {
       method: "POST",
@@ -104,7 +132,7 @@ export default function AdminProductsPage() {
           </div>
           <textarea placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
           <input
-            placeholder="Image URL (or Data URL for upload)"
+            placeholder='Image URL (e.g. "https://example.com/image.jpg")'
             value={imageData}
             onChange={(e) => setImageData(e.target.value)}
           />
