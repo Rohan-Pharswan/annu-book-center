@@ -7,6 +7,7 @@ import Product from "@/models/Product";
 import Order from "@/models/Order";
 import Discount from "@/models/Discount";
 import { applyPercentage } from "@/lib/pricing";
+import Notification from "@/models/Notification";
 
 export const GET = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
@@ -70,6 +71,17 @@ export const POST = withErrorHandling(async (request) => {
 
   user.cart = [];
   await user.save();
+  await Notification.create({
+    type: "order_placed",
+    title: "New order placed",
+    message: `${user.name || "Customer"} placed order #${String(order._id).slice(-6)} for ₹${totalAmount.toFixed(2)}`,
+    meta: {
+      orderId: order._id,
+      userId: user._id,
+      status: order.status,
+      totalAmount
+    }
+  });
 
   return NextResponse.json({ success: true, order }, { status: 201 });
 });

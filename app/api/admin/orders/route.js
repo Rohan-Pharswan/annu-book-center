@@ -8,7 +8,9 @@ export async function GET(request) {
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
   await connectDB();
-  const orders = await Order.find().sort({ createdAt: -1 }).populate("userId", "name email");
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status");
+  const query = status && status !== "All" ? { status } : {};
+  const orders = await Order.find(query).sort({ createdAt: -1 }).populate("userId", "name email");
   return NextResponse.json({ orders });
 }
-

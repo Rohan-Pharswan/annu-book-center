@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
+import { formatINR } from "@/lib/currency";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);
@@ -77,7 +78,7 @@ export default function CartPage() {
               <div key={item.product?._id || item.product} className="panel row">
                 <div>
                   <strong>{item.product?.name}</strong>
-                  <p>${item.product?.price}</p>
+                  <p>{formatINR(item.product?.finalPrice || item.product?.price)}</p>
                 </div>
                 <div className="row">
                   <input
@@ -92,7 +93,7 @@ export default function CartPage() {
                 </div>
               </div>
             ))}
-            <h3>Total: ${total.toFixed(2)}</h3>
+            <h3>Total: {formatINR(total)}</h3>
             <div className="panel">
               <h3>Checkout (Cash on Delivery)</h3>
               <select value={addressId} onChange={(e) => setAddressId(e.target.value)}>
@@ -112,4 +113,3 @@ export default function CartPage() {
     </AuthGate>
   );
 }
-

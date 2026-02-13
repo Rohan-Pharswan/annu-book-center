@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { formatINR } from "@/lib/currency";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -48,7 +49,7 @@ export default function ProductDetailPage() {
         <p className="muted">{product.category}</p>
         <h1>{product.name}</h1>
         <p>{product.description}</p>
-        <p className="price">${product.finalPrice || product.price}</p>
+        <p className="price">{formatINR(product.finalPrice || product.price)}</p>
         <p className={product.stock > 0 ? "in-stock" : "out-stock"}>
           {product.stock > 0 ? "In stock" : "Out of stock"}
         </p>
@@ -87,4 +88,3 @@ export default function ProductDetailPage() {
     </section>
   );
 }
-

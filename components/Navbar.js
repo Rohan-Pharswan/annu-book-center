@@ -8,13 +8,30 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setUser(data?.user || null))
-      .catch(() => setUser(null));
+      .then(async (data) => {
+        const currentUser = data?.user || null;
+        setUser(currentUser);
+
+        if (currentUser?.role === "admin") {
+          const res = await fetch("/api/admin/notifications?limit=1");
+          if (res.ok) {
+            const payload = await res.json();
+            setUnreadNotifications(payload.unreadCount || 0);
+          }
+        } else {
+          setUnreadNotifications(0);
+        }
+      })
+      .catch(() => {
+        setUser(null);
+        setUnreadNotifications(0);
+      });
   }, [pathname]);
 
   useEffect(() => {
@@ -57,9 +74,20 @@ export default function Navbar() {
             Bookings
           </Link>
           {user?.role === "admin" && (
-            <Link href="/admin" className={`nav-link${pathname.startsWith("/admin") ? " is-active" : ""}`}>
-              Admin
-            </Link>
+            <>
+              <Link
+                href="/admin"
+                className={`nav-link${pathname.startsWith("/admin") && pathname !== "/admin/notifications" ? " is-active" : ""}`}
+              >
+                Admin
+              </Link>
+              <Link
+                href="/admin/notifications"
+                className={`nav-link${pathname === "/admin/notifications" ? " is-active" : ""}`}
+              >
+                Alerts {unreadNotifications > 0 ? `(${unreadNotifications})` : ""}
+              </Link>
+            </>
           )}
           {!user ? (
             <>

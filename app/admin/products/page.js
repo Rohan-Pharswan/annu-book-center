@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
+import { formatINR } from "@/lib/currency";
 
 const initial = {
   name: "",
@@ -148,7 +149,7 @@ export default function AdminProductsPage() {
           {products.map((item) => (
             <div key={item._id} className="panel row between">
               <span>
-                {item.name} (${item.price}) | Stock: {item.stock}
+                {item.name} ({formatINR(item.price)}) | Stock: {item.stock}
               </span>
               <div className="row">
                 <button className="ghost-btn" onClick={() => quickUpdate(item)}>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
+import { formatINR } from "@/lib/currency";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -27,7 +28,7 @@ export default function OrdersPage() {
                 <strong>Order #{order._id.slice(-6)}</strong>
                 <span className="status">{order.status}</span>
               </div>
-              <p>Total: ${order.totalAmount.toFixed(2)}</p>
+              <p>Total: {formatINR(order.totalAmount)}</p>
               <p>
                 Address: {order.address?.line1}, {order.address?.city}
               </p>
@@ -39,4 +40,3 @@ export default function OrdersPage() {
     </AuthGate>
   );
 }
-

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
+import { formatINR } from "@/lib/currency";
 
 export default function WishlistPage() {
   const [wishlist, setWishlist] = useState([]);
@@ -32,7 +33,7 @@ export default function WishlistPage() {
               <img src={item.images?.[0]} alt={item.name} className="card-image" />
               <div className="card-body">
                 <h3>{item.name}</h3>
-                <p>${item.price}</p>
+                <p>{formatINR(item.price)}</p>
                 <div className="row">
                   <Link href={`/products/${item._id}`} className="btn">
                     Details
@@ -49,4 +50,3 @@ export default function WishlistPage() {
     </AuthGate>
   );
 }
-

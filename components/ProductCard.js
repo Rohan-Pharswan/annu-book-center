@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatINR } from "@/lib/currency";
 
 export default function ProductCard({ product, onWishlist, onCart }) {
   return (
@@ -10,9 +11,9 @@ export default function ProductCard({ product, onWishlist, onCart }) {
         <p className="muted">{product.category}</p>
         <h3>{product.name}</h3>
         <p className="price">
-          ${product.finalPrice || product.price}
+          {formatINR(product.finalPrice || product.price)}
           {(product.discountPercentage || 0) > 0 && (
-            <span className="strike">${product.price}</span>
+            <span className="strike">{formatINR(product.price)}</span>
           )}
         </p>
         <p className="rating">

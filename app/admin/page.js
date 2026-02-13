@@ -19,6 +19,9 @@ export default function AdminHomePage() {
           <Link className="panel" href="/admin/orders">
             Orders
           </Link>
+          <Link className="panel" href="/admin/notifications">
+            Notifications
+          </Link>
           <Link className="panel" href="/admin/users">
             Users
           </Link>
