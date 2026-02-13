@@ -8,12 +8,17 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setUser(data?.user || null))
       .catch(() => setUser(null));
+  }, [pathname]);
+
+  useEffect(() => {
+    setMenuOpen(false);
   }, [pathname]);
 
   async function logout() {
@@ -29,7 +34,16 @@ export default function Navbar() {
         <Link href="/" className="brand">
           Annu Book Store
         </Link>
-        <nav className="menu">
+        <button
+          className="ghost-btn menu-toggle"
+          aria-label="Toggle navigation menu"
+          aria-expanded={menuOpen}
+          aria-controls="main-nav"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          Menu
+        </button>
+        <nav id="main-nav" className={`menu${menuOpen ? " is-open" : ""}`}>
           <Link href="/cart" className={`nav-link${pathname === "/cart" ? " is-active" : ""}`}>
             Cart
           </Link>

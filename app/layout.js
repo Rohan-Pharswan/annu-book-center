@@ -6,6 +6,12 @@ export const metadata = {
   description: "Bookstore and stationery shop"
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0b1426"
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
@@ -16,4 +22,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-
