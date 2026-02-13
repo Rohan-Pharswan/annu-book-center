@@ -11,6 +11,15 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Newest");
 
+  function getOrderDisplay(order) {
+    const deliveryCharge = Number(order.deliveryCharge ?? 100);
+    const subtotalAmount = Number(
+      order.subtotalAmount ?? Math.max(Number(order.totalAmount || 0) - deliveryCharge, 0)
+    );
+    const totalSavings = Number(order.totalSavings ?? 0);
+    return { deliveryCharge, subtotalAmount, totalSavings };
+  }
+
   async function load() {
     const params = new URLSearchParams();
     if (statusFilter !== "All") params.set("status", statusFilter);
@@ -28,6 +37,26 @@ export default function AdminOrdersPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status })
+    });
+    await load();
+  }
+
+  async function setVerification(id, payload) {
+    await fetch(`/api/admin/orders/${id}/verify`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    await load();
+  }
+
+  async function deleteOrder(id) {
+    const confirmed = window.confirm("Delete this order permanently?");
+    if (!confirmed) return;
+    await fetch("/api/admin/orders", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
     });
     await load();
   }
@@ -73,22 +102,54 @@ export default function AdminOrdersPage() {
           </select>
         </div>
         <div className="stack">
-          {visibleOrders.map((order) => (
-            <div key={order._id} className="panel">
-              <p>
-                <strong>{order.userId?.name}</strong> ({order.userId?.email})
-              </p>
-              <p>Total: {formatINR(order.totalAmount)}</p>
-              <p>Status: {order.status}</p>
-              <select value={order.status} onChange={(e) => updateStatus(order._id, e.target.value)}>
-                {statuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
+          {visibleOrders.map((order) => {
+            const { deliveryCharge, subtotalAmount, totalSavings } = getOrderDisplay(order);
+            return (
+              <div key={order._id} className="panel">
+                <p>
+                  <strong>{order.userId?.name}</strong> ({order.userId?.email})
+                </p>
+                <p>Date: {new Date(order.createdAt).toLocaleDateString()}</p>
+                <p>Time: {new Date(order.createdAt).toLocaleTimeString()}</p>
+                <p>Phone: {order.customerPhone || order.address?.phone || "N/A"}</p>
+                <p>Email: {order.customerEmail || order.userId?.email || "N/A"}</p>
+                <p>
+                  Email Verified: {order.emailVerifiedByAdmin ? "Yes" : "No"} | Phone Verified:{" "}
+                  {order.phoneVerifiedByAdmin ? "Yes" : "No"}
+                </p>
+                <p>Subtotal: {formatINR(subtotalAmount)}</p>
+                <p>You Saved: {formatINR(totalSavings)}</p>
+                <p>Delivery Charge: {formatINR(deliveryCharge)}</p>
+                <p>Total: {formatINR(order.totalAmount)}</p>
+                <p>Status: {order.status}</p>
+                <div className="row">
+                  <select value={order.status} onChange={(e) => updateStatus(order._id, e.target.value)}>
+                    {statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="ghost-btn"
+                    onClick={() => setVerification(order._id, { emailVerifiedByAdmin: !order.emailVerifiedByAdmin })}
+                  >
+                    {order.emailVerifiedByAdmin ? "Unverify Email" : "Verify Email"}
+                  </button>
+                  <button
+                    className="ghost-btn"
+                    onClick={() => setVerification(order._id, { phoneVerifiedByAdmin: !order.phoneVerifiedByAdmin })}
+                  >
+                    {order.phoneVerifiedByAdmin ? "Unverify Phone" : "Verify Phone"}
+                  </button>
+                  <button className="ghost-btn" onClick={() => deleteOrder(order._id)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {!visibleOrders.length && <p className="muted">No orders found for the selected filter.</p>}
         </div>
       </section>
     </AuthGate>

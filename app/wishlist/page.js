@@ -33,7 +33,11 @@ export default function WishlistPage() {
               <img src={item.images?.[0]} alt={item.name} className="card-image" />
               <div className="card-body">
                 <h3>{item.name}</h3>
-                <p>{formatINR(item.price)}</p>
+                <p>
+                  {formatINR(item.finalPrice || item.price)}
+                  {Number(item.savings || 0) > 0 && <span className="strike">{formatINR(item.originalPrice || item.price)}</span>}
+                </p>
+                {Number(item.savings || 0) > 0 && <p className="muted">You save {formatINR(item.savings)}</p>}
                 <div className="row">
                   <Link href={`/products/${item._id}`} className="btn">
                     Details

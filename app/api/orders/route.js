@@ -6,7 +6,7 @@ import User from "@/models/User";
 import Product from "@/models/Product";
 import Order from "@/models/Order";
 import Discount from "@/models/Discount";
-import { applyPercentage } from "@/lib/pricing";
+import { calculateDiscountedPrice, DEFAULT_DELIVERY_CHARGE, getBestDiscountForProduct } from "@/lib/pricing";
 import Notification from "@/models/Notification";
 
 export const GET = withErrorHandling(async (request) => {
@@ -31,7 +31,9 @@ export const POST = withErrorHandling(async (request) => {
   if (!address) return NextResponse.json({ error: "Invalid address" }, { status: 400 });
 
   const discounts = await Discount.find({ active: true });
-  let totalAmount = 0;
+  let subtotalAmount = 0;
+  let discountedSubtotal = 0;
+  let totalSavings = 0;
   const items = [];
 
   for (const cartItem of user.cart) {
@@ -40,31 +42,45 @@ export const POST = withErrorHandling(async (request) => {
       return NextResponse.json({ error: `Insufficient stock for ${cartItem.product.name}` }, { status: 400 });
     }
 
-    const discount = discounts.find(
-      (d) =>
-        (d.scopeType === "product" && String(d.productId) === String(product._id)) ||
-        (d.scopeType === "category" && d.category === product.category)
-    );
-    const unitPrice = applyPercentage(product.price, discount?.percentage || 0);
+    const discount = getBestDiscountForProduct(product, discounts);
+    const pricing = calculateDiscountedPrice(product.price, discount);
+    const unitPrice = pricing.finalPrice;
     const lineTotal = unitPrice * cartItem.quantity;
-    totalAmount += lineTotal;
+    const lineOriginal = pricing.originalPrice * cartItem.quantity;
+    const lineSavings = pricing.savings * cartItem.quantity;
+
+    subtotalAmount += lineOriginal;
+    discountedSubtotal += lineTotal;
+    totalSavings += lineSavings;
 
     items.push({
       productId: product._id,
       name: product.name,
       image: product.images[0],
+      originalPrice: pricing.originalPrice,
       price: unitPrice,
+      savingsPerUnit: pricing.savings,
       quantity: cartItem.quantity
     });
     product.stock -= cartItem.quantity;
     await product.save();
   }
 
+  const deliveryCharge = DEFAULT_DELIVERY_CHARGE;
+  const totalAmount = Number((discountedSubtotal + deliveryCharge).toFixed(2));
+
   const order = await Order.create({
     userId: auth.user._id,
     items,
+    subtotalAmount: Number(subtotalAmount.toFixed(2)),
+    totalSavings: Number(totalSavings.toFixed(2)),
+    deliveryCharge,
     totalAmount,
     address,
+    customerEmail: user.email || "",
+    customerPhone: address.phone || "",
+    emailVerifiedByAdmin: false,
+    phoneVerifiedByAdmin: false,
     status: "Pending",
     paymentMethod: "Cash on Delivery"
   });
@@ -74,7 +90,7 @@ export const POST = withErrorHandling(async (request) => {
   await Notification.create({
     type: "order_placed",
     title: "New order placed",
-    message: `${user.name || "Customer"} placed order #${String(order._id).slice(-6)} for ₹${totalAmount.toFixed(2)}`,
+    message: `${user.name || "Customer"} placed order #${String(order._id).slice(-6)} for \u20B9${totalAmount.toFixed(2)}`,
     meta: {
       orderId: order._id,
       userId: user._id,

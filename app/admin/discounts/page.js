@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 
-const initial = { scopeType: "category", productId: "", category: "", percentage: 10, active: true };
+const initial = { scopeType: "category", productId: "", category: "", discountType: "percentage", value: 10, active: true };
 
 export default function AdminDiscountsPage() {
   const [discounts, setDiscounts] = useState([]);
@@ -24,7 +24,11 @@ export default function AdminDiscountsPage() {
     await fetch("/api/discounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, percentage: Number(form.percentage) })
+      body: JSON.stringify({
+        ...form,
+        value: Number(form.value),
+        percentage: form.discountType === "percentage" ? Number(form.value) : undefined
+      })
     });
     setForm(initial);
     await load();
@@ -48,6 +52,10 @@ export default function AdminDiscountsPage() {
             <option value="category">By Category</option>
             <option value="product">By Product ID</option>
           </select>
+          <select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })}>
+            <option value="percentage">Percentage (%)</option>
+            <option value="flat">{"Fixed Amount (\u20B9)"}</option>
+          </select>
           {form.scopeType === "category" ? (
             <input placeholder="Category name" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required />
           ) : (
@@ -56,9 +64,9 @@ export default function AdminDiscountsPage() {
           <input
             type="number"
             min={1}
-            max={90}
-            value={form.percentage}
-            onChange={(e) => setForm({ ...form, percentage: e.target.value })}
+            max={form.discountType === "percentage" ? 90 : undefined}
+            value={form.value}
+            onChange={(e) => setForm({ ...form, value: e.target.value })}
             required
           />
           <button className="btn">Create Discount</button>
@@ -68,7 +76,8 @@ export default function AdminDiscountsPage() {
           {discounts.map((d) => (
             <div key={d._id} className="panel row between">
               <span>
-                {d.scopeType === "category" ? `Category: ${d.category}` : `Product: ${d.productId}`} | {d.percentage}%
+                {d.scopeType === "category" ? `Category: ${d.category}` : `Product: ${d.productId}`} |{" "}
+                {d.discountType === "flat" ? `\u20B9${d.value} off` : `${d.percentage || d.value}% off`}
               </span>
               <button className="ghost-btn" onClick={() => toggle(d)}>
                 {d.active ? "Disable" : "Enable"}
@@ -80,4 +89,3 @@ export default function AdminDiscountsPage() {
     </AuthGate>
   );
 }
-

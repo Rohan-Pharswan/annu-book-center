@@ -12,10 +12,11 @@ export default function ProductCard({ product, onWishlist, onCart }) {
         <h3>{product.name}</h3>
         <p className="price">
           {formatINR(product.finalPrice || product.price)}
-          {(product.discountPercentage || 0) > 0 && (
-            <span className="strike">{formatINR(product.price)}</span>
+          {Number(product.savings || 0) > 0 && (
+            <span className="strike">{formatINR(product.originalPrice || product.price)}</span>
           )}
         </p>
+        {Number(product.savings || 0) > 0 && <p className="muted">You save {formatINR(product.savings)}</p>}
         <p className="rating">
           {product.rating || 0} / 5 ({product.ratingCount || 0})
         </p>

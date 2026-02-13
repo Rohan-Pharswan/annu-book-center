@@ -5,7 +5,7 @@ import { validate, productSchema } from "@/lib/validators";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Product from "@/models/Product";
 import Discount from "@/models/Discount";
-import { applyPercentage } from "@/lib/pricing";
+import { calculateDiscountedPrice, getBestDiscountForProduct } from "@/lib/pricing";
 
 function normalizeImageUrl(value) {
   if (typeof value !== "string") return "";
@@ -46,16 +46,11 @@ export const GET = withErrorHandling(async (request) => {
 
   const discounts = await Discount.find({ active: true }).lean();
   const data = items.map((item) => {
-    const productDiscount = discounts.find(
-      (d) =>
-        (d.scopeType === "product" && String(d.productId) === String(item._id)) ||
-        (d.scopeType === "category" && d.category === item.category)
-    );
-    const discountPercentage = productDiscount?.percentage || 0;
+    const productDiscount = getBestDiscountForProduct(item, discounts);
+    const pricing = calculateDiscountedPrice(item.price, productDiscount);
     return {
       ...item,
-      discountPercentage,
-      finalPrice: applyPercentage(item.price, discountPercentage)
+      ...pricing
     };
   });
 

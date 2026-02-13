@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
 import { formatINR } from "@/lib/currency";
 
 export default function CartPage() {
   const [cart, setCart] = useState([]);
+  const [pricing, setPricing] = useState({
+    subtotalAmount: 0,
+    discountedSubtotal: 0,
+    totalSavings: 0,
+    deliveryCharge: 100,
+    totalAmount: 0
+  });
   const [addresses, setAddresses] = useState([]);
   const [addressId, setAddressId] = useState("");
 
@@ -14,6 +21,15 @@ export default function CartPage() {
     const res = await fetch("/api/cart");
     const data = await res.json();
     setCart(data.cart || []);
+    setPricing(
+      data.pricing || {
+        subtotalAmount: 0,
+        discountedSubtotal: 0,
+        totalSavings: 0,
+        deliveryCharge: 100,
+        totalAmount: 0
+      }
+    );
   }
 
   async function loadProfile() {
@@ -27,15 +43,6 @@ export default function CartPage() {
     loadCart();
     loadProfile();
   }, []);
-
-  const total = useMemo(
-    () =>
-      cart.reduce((sum, item) => {
-        const price = item.product?.finalPrice || item.product?.price || 0;
-        return sum + price * item.quantity;
-      }, 0),
-    [cart]
-  );
 
   async function updateQuantity(productId, quantity) {
     await fetch("/api/cart", {
@@ -78,7 +85,14 @@ export default function CartPage() {
               <div key={item.product?._id || item.product} className="panel row">
                 <div>
                   <strong>{item.product?.name}</strong>
-                  <p>{formatINR(item.product?.finalPrice || item.product?.price)}</p>
+                  {Number(item.product?.savings || 0) > 0 ? (
+                    <p>
+                      <span className="strike">{formatINR(item.product?.originalPrice)}</span>{" "}
+                      <strong>{formatINR(item.product?.finalPrice)}</strong>
+                    </p>
+                  ) : (
+                    <p>{formatINR(item.product?.finalPrice || item.product?.price)}</p>
+                  )}
                 </div>
                 <div className="row">
                   <input
@@ -93,7 +107,12 @@ export default function CartPage() {
                 </div>
               </div>
             ))}
-            <h3>Total: {formatINR(total)}</h3>
+            <div className="panel stack">
+              <p>Subtotal: {formatINR(pricing.subtotalAmount)}</p>
+              <p>You Saved: {formatINR(pricing.totalSavings)}</p>
+              <p>Delivery (COD): {formatINR(pricing.deliveryCharge)}</p>
+              <h3>Total: {formatINR(pricing.totalAmount)}</h3>
+            </div>
             <div className="panel">
               <h3>Checkout (Cash on Delivery)</h3>
               <select value={addressId} onChange={(e) => setAddressId(e.target.value)}>

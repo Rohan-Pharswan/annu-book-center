@@ -49,7 +49,13 @@ export default function ProductDetailPage() {
         <p className="muted">{product.category}</p>
         <h1>{product.name}</h1>
         <p>{product.description}</p>
-        <p className="price">{formatINR(product.finalPrice || product.price)}</p>
+        <p className="price">
+          {formatINR(product.finalPrice || product.price)}
+          {Number(product.savings || 0) > 0 && (
+            <span className="strike">{formatINR(product.originalPrice || product.price)}</span>
+          )}
+        </p>
+        {Number(product.savings || 0) > 0 && <p className="muted">You save {formatINR(product.savings)}</p>}
         <p className={product.stock > 0 ? "in-stock" : "out-stock"}>
           {product.stock > 0 ? "In stock" : "Out of stock"}
         </p>
