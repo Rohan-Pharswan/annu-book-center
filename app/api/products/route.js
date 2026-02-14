@@ -6,6 +6,7 @@ import { withErrorHandling } from "@/lib/apiHandler";
 import Product from "@/models/Product";
 import Discount from "@/models/Discount";
 import { calculateDiscountedPrice, getBestDiscountForProduct } from "@/lib/pricing";
+import mongoose from "mongoose";
 
 function normalizeImageUrl(value) {
   if (typeof value !== "string") return "";
@@ -26,17 +27,28 @@ function normalizeImageUrl(value) {
   return text;
 }
 
+function escapeRegex(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export const GET = withErrorHandling(async (request) => {
   await connectDB();
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q") || "";
+  const q = (searchParams.get("q") || "").trim().slice(0, 80);
   const category = searchParams.get("category") || "";
   const page = Number(searchParams.get("page") || 1);
   const limit = Math.min(Number(searchParams.get("limit") || 10), 50);
   const skip = (page - 1) * limit;
 
   const query = {};
-  if (q) query.name = { $regex: q, $options: "i" };
+  if (q) {
+    const qRegex = { $regex: escapeRegex(q), $options: "i" };
+    const or = [{ name: qRegex }, { category: qRegex }];
+    if (mongoose.Types.ObjectId.isValid(q)) {
+      or.push({ _id: new mongoose.Types.ObjectId(q) });
+    }
+    query.$or = or;
+  }
   if (category) query.category = category;
 
   const [items, total] = await Promise.all([

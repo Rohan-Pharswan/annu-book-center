@@ -35,19 +35,27 @@ export const POST = withErrorHandling(async (request) => {
   let discountedSubtotal = 0;
   let totalSavings = 0;
   const items = [];
+  const updatedProducts = [];
 
   for (const cartItem of user.cart) {
-    const product = await Product.findById(cartItem.product._id);
-    if (!product || product.stock < cartItem.quantity) {
-      return NextResponse.json({ error: `Insufficient stock for ${cartItem.product.name}` }, { status: 400 });
+    const productId = cartItem.product?._id || cartItem.product;
+    const product = await Product.findById(productId);
+    const productName = product?.name || cartItem.product?.name || "a product";
+    if (!product) {
+      return NextResponse.json({ error: `Product no longer available: ${productName}` }, { status: 400 });
+    }
+
+    const quantity = Number(cartItem.quantity || 1);
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      return NextResponse.json({ error: `Invalid quantity for ${productName}` }, { status: 400 });
     }
 
     const discount = getBestDiscountForProduct(product, discounts);
     const pricing = calculateDiscountedPrice(product.price, discount);
     const unitPrice = pricing.finalPrice;
-    const lineTotal = unitPrice * cartItem.quantity;
-    const lineOriginal = pricing.originalPrice * cartItem.quantity;
-    const lineSavings = pricing.savings * cartItem.quantity;
+    const lineTotal = unitPrice * quantity;
+    const lineOriginal = pricing.originalPrice * quantity;
+    const lineSavings = pricing.savings * quantity;
 
     subtotalAmount += lineOriginal;
     discountedSubtotal += lineTotal;
@@ -60,10 +68,23 @@ export const POST = withErrorHandling(async (request) => {
       originalPrice: pricing.originalPrice,
       price: unitPrice,
       savingsPerUnit: pricing.savings,
-      quantity: cartItem.quantity
+      quantity
     });
-    product.stock -= cartItem.quantity;
-    await product.save();
+
+    const updated = await Product.findOneAndUpdate(
+      { _id: product._id, stock: { $gte: quantity } },
+      { $inc: { stock: -quantity } },
+      { new: true }
+    );
+
+    if (!updated) {
+      for (const rollback of updatedProducts) {
+        await Product.findByIdAndUpdate(rollback.productId, { $inc: { stock: rollback.quantity } });
+      }
+      return NextResponse.json({ error: `Insufficient stock for ${productName}` }, { status: 400 });
+    }
+
+    updatedProducts.push({ productId: product._id, quantity });
   }
 
   const deliveryCharge = DEFAULT_DELIVERY_CHARGE;

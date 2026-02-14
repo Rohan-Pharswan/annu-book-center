@@ -2,10 +2,32 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import Discount from "@/models/Discount";
+import mongoose from "mongoose";
 
-export async function GET() {
+export async function GET(request) {
   await connectDB();
-  const discounts = await Discount.find().sort({ createdAt: -1 });
+  const { searchParams } = new URL(request.url);
+  const scopeType = searchParams.get("scopeType");
+  const productId = searchParams.get("productId");
+  const active = searchParams.get("active");
+
+  const query = {};
+  if (scopeType === "product" || scopeType === "category") {
+    query.scopeType = scopeType;
+  }
+
+  if (productId) {
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
+    }
+    query.productId = productId;
+  }
+
+  if (active === "true" || active === "false") {
+    query.active = active === "true";
+  }
+
+  const discounts = await Discount.find(query).sort({ createdAt: -1 });
   return NextResponse.json({ discounts });
 }
 
@@ -32,6 +54,18 @@ export async function POST(request) {
     percentage: discountType === "percentage" ? numericValue : undefined,
     value: discountType === "flat" ? numericValue : undefined
   };
+
+  if (payload.scopeType === "category" && !payload.category) {
+    return NextResponse.json({ error: "Category is required for category discount" }, { status: 400 });
+  }
+  if (payload.scopeType === "product") {
+    if (!payload.productId) {
+      return NextResponse.json({ error: "Product ID is required for product discount" }, { status: 400 });
+    }
+    if (!mongoose.Types.ObjectId.isValid(String(payload.productId))) {
+      return NextResponse.json({ error: "Invalid product ID format" }, { status: 400 });
+    }
+  }
 
   await connectDB();
   const discount = await Discount.create(payload);

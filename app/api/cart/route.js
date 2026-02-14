@@ -17,7 +17,13 @@ export async function GET(request) {
   let discountedSubtotal = 0;
   let totalSavings = 0;
 
-  const cart = user.cart.map((item) => {
+  const validCartItems = user.cart.filter((item) => Boolean(item.product));
+  if (validCartItems.length !== user.cart.length) {
+    user.cart = user.cart.filter((item) => Boolean(item.product));
+    await user.save();
+  }
+
+  const cart = validCartItems.map((item) => {
     const product = item.product?.toObject ? item.product.toObject() : item.product;
     const pricing = calculateDiscountedPrice(product?.price || 0, getBestDiscountForProduct(product, discounts));
     const quantity = Number(item.quantity || 1);
@@ -52,12 +58,16 @@ export async function POST(request) {
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   const { productId, quantity = 1 } = await request.json();
   if (!productId) return NextResponse.json({ error: "productId is required" }, { status: 400 });
+  const qty = Number(quantity);
+  if (!Number.isInteger(qty) || qty <= 0 || qty > 99) {
+    return NextResponse.json({ error: "quantity must be an integer between 1 and 99" }, { status: 400 });
+  }
 
   await connectDB();
   const user = await User.findById(auth.user._id);
   const index = user.cart.findIndex((item) => String(item.product) === productId);
-  if (index >= 0) user.cart[index].quantity += Number(quantity);
-  else user.cart.push({ product: productId, quantity: Number(quantity) });
+  if (index >= 0) user.cart[index].quantity = Math.min(99, Number(user.cart[index].quantity || 1) + qty);
+  else user.cart.push({ product: productId, quantity: qty });
 
   await user.save();
   return NextResponse.json({ success: true, cart: user.cart });
@@ -70,13 +80,17 @@ export async function PATCH(request) {
   if (!productId || !quantity) {
     return NextResponse.json({ error: "productId and quantity are required" }, { status: 400 });
   }
+  const qty = Number(quantity);
+  if (!Number.isInteger(qty) || qty <= 0 || qty > 99) {
+    return NextResponse.json({ error: "quantity must be an integer between 1 and 99" }, { status: 400 });
+  }
 
   await connectDB();
   const user = await User.findById(auth.user._id);
   const item = user.cart.find((cartItem) => String(cartItem.product) === productId);
   if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
-  item.quantity = Math.max(1, Number(quantity));
+  item.quantity = qty;
   await user.save();
   return NextResponse.json({ success: true, cart: user.cart });
 }
