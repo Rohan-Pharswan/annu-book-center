@@ -3,16 +3,23 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { formatINR } from "@/lib/currency";
+import { useToast } from "@/components/ToastProvider";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const [product, setProduct] = useState(null);
   const [review, setReview] = useState({ rating: 5, comment: "" });
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const toast = useToast();
 
   async function loadProduct() {
-    const res = await fetch(`/api/products/${params.id}`);
-    const data = await res.json();
-    setProduct(data);
+    try {
+      const res = await fetch(`/api/products/${params.id}`);
+      const data = await res.json();
+      setProduct(data);
+    } catch {
+      toast.error("Failed to load product details");
+    }
   }
 
   useEffect(() => {
@@ -20,77 +27,196 @@ export default function ProductDetailPage() {
   }, [params?.id]);
 
   async function addToCart() {
-    await fetch("/api/cart", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId: params.id, quantity: 1 })
-    });
+    try {
+      const res = await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: params.id, quantity: 1 })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to add to cart");
+        return;
+      }
+      toast.success("Added to cart!");
+      window.dispatchEvent(new CustomEvent("cart-updated"));
+    } catch {
+      toast.error("Failed to add to cart");
+    }
+  }
+
+  async function addToWishlist() {
+    try {
+      const res = await fetch(`/api/wishlist/${params.id}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update wishlist");
+        return;
+      }
+      toast.success("Added to wishlist!");
+      window.dispatchEvent(new CustomEvent("wishlist-updated"));
+    } catch {
+      toast.error("Failed to update wishlist");
+    }
   }
 
   async function submitReview(e) {
     e.preventDefault();
-    await fetch(`/api/products/${params.id}/reviews`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...review, rating: Number(review.rating) })
-    });
-    setReview({ rating: 5, comment: "" });
-    await loadProduct();
+    setReviewSubmitting(true);
+    try {
+      const res = await fetch(`/api/products/${params.id}/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...review, rating: Number(review.rating) })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to submit review");
+        return;
+      }
+      toast.success("Review submitted!");
+      setReview({ rating: 5, comment: "" });
+      await loadProduct();
+    } catch {
+      toast.error("Failed to submit review");
+    } finally {
+      setReviewSubmitting(false);
+    }
   }
 
-  if (!product) return <p>Loading...</p>;
+  if (!product) {
+    return (
+      <section className="grid detail" aria-busy="true" aria-label="Loading product details">
+        <div className="skeleton detail-image" style={{ height: "380px" }} />
+        <div className="stack">
+          <div className="skeleton" style={{ height: "24px", width: "120px" }} />
+          <div className="skeleton" style={{ height: "36px", width: "70%" }} />
+          <div className="skeleton" style={{ height: "80px", width: "100%" }} />
+          <div className="skeleton" style={{ height: "32px", width: "160px" }} />
+          <div className="skeleton" style={{ height: "44px", width: "200px" }} />
+        </div>
+      </section>
+    );
+  }
+
+  const imageUrl = Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : "";
+  const hasDiscount = Number(product.savings || 0) > 0;
 
   return (
     <section className="grid detail">
       <div>
-        <img src={product.images?.[0]} alt={product.name} className="detail-image" />
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={product.name}
+            className="detail-image"
+            loading="eager"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="detail-image" style={{ height: "340px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3rem", color: "#94a3b8" }}>
+            📚
+          </div>
+        )}
       </div>
-      <div>
-        <p className="muted">{product.category}</p>
-        <h1>{product.name}</h1>
-        <p>{product.description}</p>
-        <p className="price">
-          {formatINR(product.finalPrice || product.price)}
-          {Number(product.savings || 0) > 0 && (
+
+      <div className="stack">
+        <div className="row between">
+          <span className="muted" style={{ fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>
+            {product.category}
+          </span>
+          {hasDiscount && (
+            <span className="discount-badge">
+              {product.discountLabel || `Save ${formatINR(product.savings)}`}
+            </span>
+          )}
+        </div>
+
+        <h1 style={{ margin: "0 0 6px" }}>{product.name}</h1>
+        <p className="muted" style={{ fontSize: "1rem", lineHeight: "1.6" }}>{product.description}</p>
+
+        <div className="price">
+          <span>{formatINR(product.finalPrice || product.price)}</span>
+          {hasDiscount && (
             <span className="strike">{formatINR(product.originalPrice || product.price)}</span>
           )}
-        </p>
-        {Number(product.savings || 0) > 0 && <p className="muted">You save {formatINR(product.savings)}</p>}
-        <p className={product.stock > 0 ? "in-stock" : "out-stock"}>
-          {product.stock > 0 ? "In stock" : "Out of stock"}
-        </p>
-        <button className="btn" onClick={addToCart} disabled={product.stock <= 0}>
-          Add to cart
-        </button>
+        </div>
 
-        <h3>Reviews</h3>
-        <form onSubmit={submitReview} className="stack">
-          <select value={review.rating} onChange={(e) => setReview({ ...review, rating: e.target.value })}>
-            {[5, 4, 3, 2, 1].map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-          <textarea
-            placeholder="Write your review"
-            value={review.comment}
-            onChange={(e) => setReview({ ...review, comment: e.target.value })}
-            required
-          />
-          <button className="btn">Submit Review</button>
+        <div className="row" style={{ gap: "16px", margin: "6px 0 16px" }}>
+          <span className="rating" aria-label={`Rating ${product.rating || 0} out of 5 stars`}>
+            ★ {product.rating ? Number(product.rating).toFixed(1) : "0.0"} <span className="muted">({product.ratingCount || 0} customer reviews)</span>
+          </span>
+          <span className={product.stock > 0 ? "in-stock" : "out-stock"}>
+            {product.stock > 0 ? `${product.stock} in stock` : "Out of stock"}
+          </span>
+        </div>
+
+        <div className="row" style={{ gap: "12px", marginBottom: "24px" }}>
+          <button className="btn" onClick={addToCart} disabled={product.stock <= 0}>
+            {product.stock > 0 ? "Add to Cart" : "Out of Stock"}
+          </button>
+          <button className="btn-secondary" onClick={addToWishlist}>
+            ♡ Add to Wishlist
+          </button>
+        </div>
+
+        <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "16px 0" }} />
+
+        <h3>Customer Reviews ({product.reviews?.length || 0})</h3>
+
+        <form onSubmit={submitReview} className="panel stack" aria-label="Submit a review">
+          <h4>Write a Review</h4>
+          <div>
+            <label htmlFor="review-rating">Rating</label>
+            <select
+              id="review-rating"
+              value={review.rating}
+              onChange={(e) => setReview({ ...review, rating: e.target.value })}
+            >
+              <option value={5}>★★★★★ (5 - Excellent)</option>
+              <option value={4}>★★★★☆ (4 - Good)</option>
+              <option value={3}>★★★☆☆ (3 - Average)</option>
+              <option value={2}>★★☆☆☆ (2 - Below Average)</option>
+              <option value={1}>★☆☆☆☆ (1 - Poor)</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="review-comment">Your Review</label>
+            <textarea
+              id="review-comment"
+              placeholder="Share your thoughts about this product..."
+              value={review.comment}
+              onChange={(e) => setReview({ ...review, comment: e.target.value })}
+              required
+            />
+          </div>
+
+          <button className="btn" style={{ alignSelf: "flex-start" }} disabled={reviewSubmitting}>
+            {reviewSubmitting ? "Submitting..." : "Submit Review"}
+          </button>
         </form>
 
         <div className="stack">
           {product.reviews?.map((item) => (
-            <div key={item._id} className="panel">
-              <strong>{item.userId?.name || "User"}</strong>
-              <p>{item.rating} / 5</p>
-              <p>{item.comment}</p>
+            <div key={item._id} className="panel stack" style={{ padding: "16px" }}>
+              <div className="row between">
+                <strong>{item.userId?.name || "Customer"}</strong>
+                <span className="rating" aria-label={`Rated ${item.rating} out of 5`}>
+                  {"★".repeat(item.rating)}{"☆".repeat(5 - item.rating)}
+                </span>
+              </div>
+              <p style={{ margin: 0 }}>{item.comment}</p>
             </div>
           ))}
+          {!product.reviews?.length && (
+            <p className="muted">No reviews yet for this product. Be the first to leave a review!</p>
+          )}
         </div>
       </div>
     </section>
   );
 }
+

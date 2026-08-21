@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { withErrorHandling } from "@/lib/apiHandler";
 import Order from "@/models/Order";
+import Product from "@/models/Product";
 
-export async function GET(request) {
+export const GET = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
@@ -13,9 +15,9 @@ export async function GET(request) {
   const query = status && status !== "All" ? { status } : {};
   const orders = await Order.find(query).sort({ createdAt: -1 }).populate("userId", "name email");
   return NextResponse.json({ orders });
-}
+});
 
-export async function DELETE(request) {
+export const DELETE = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
@@ -23,7 +25,20 @@ export async function DELETE(request) {
   if (!id) return NextResponse.json({ error: "Order id is required" }, { status: 400 });
 
   await connectDB();
-  const deleted = await Order.findByIdAndDelete(id);
-  if (!deleted) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  const order = await Order.findById(id);
+  if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+  if (order.status !== "Cancelled") {
+    for (const item of order.items || []) {
+      if (item.productId) {
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: Number(item.quantity || 0) }
+        });
+      }
+    }
+  }
+
+  await Order.findByIdAndDelete(id);
   return NextResponse.json({ success: true });
-}
+});
+

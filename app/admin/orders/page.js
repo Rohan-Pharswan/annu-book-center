@@ -3,13 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import { formatINR } from "@/lib/currency";
+import { useToast } from "@/components/ToastProvider";
 
 const statuses = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
+
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Newest");
+  const toast = useToast();
 
   function getOrderDisplay(order) {
     const deliveryCharge = Number(order.deliveryCharge ?? 100);
@@ -21,11 +24,15 @@ export default function AdminOrdersPage() {
   }
 
   async function load() {
-    const params = new URLSearchParams();
-    if (statusFilter !== "All") params.set("status", statusFilter);
-    const res = await fetch(`/api/admin/orders?${params.toString()}`);
-    const data = await res.json();
-    setOrders(data.orders || []);
+    try {
+      const params = new URLSearchParams();
+      if (statusFilter !== "All") params.set("status", statusFilter);
+      const res = await fetch(`/api/admin/orders?${params.toString()}`);
+      const data = await res.json();
+      setOrders(data.orders || []);
+    } catch {
+      toast.error("Failed to load orders");
+    }
   }
 
   useEffect(() => {
@@ -33,33 +40,64 @@ export default function AdminOrdersPage() {
   }, [statusFilter]);
 
   async function updateStatus(id, status) {
-    await fetch(`/api/admin/orders/${id}/status`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status })
-    });
-    await load();
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update status");
+        return;
+      }
+      toast.success(`Order status updated to ${status}`);
+      await load();
+    } catch {
+      toast.error("Failed to update status");
+    }
   }
 
   async function setVerification(id, payload) {
-    await fetch(`/api/admin/orders/${id}/verify`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    await load();
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/verify`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update verification");
+        return;
+      }
+      toast.success("Verification status updated");
+      await load();
+    } catch {
+      toast.error("Failed to update verification");
+    }
   }
 
   async function deleteOrder(id) {
     const confirmed = window.confirm("Delete this order permanently?");
     if (!confirmed) return;
-    await fetch("/api/admin/orders", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id })
-    });
-    await load();
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete order");
+        return;
+      }
+      toast.success("Order deleted successfully");
+      await load();
+    } catch {
+      toast.error("Failed to delete order");
+    }
   }
+
 
   const visibleOrders = useMemo(() => {
     const items = [...orders];
@@ -120,8 +158,36 @@ export default function AdminOrdersPage() {
                 <p>Subtotal: {formatINR(subtotalAmount)}</p>
                 <p>You Saved: {formatINR(totalSavings)}</p>
                 <p>Delivery Charge: {formatINR(deliveryCharge)}</p>
-                <p>Total: {formatINR(order.totalAmount)}</p>
-                <p>Status: {order.status}</p>
+                <p><strong>Total: {formatINR(order.totalAmount)}</strong></p>
+                <p>Status: <span className="status">{order.status}</span></p>
+
+                {/* Ordered Items Breakdown */}
+                {Array.isArray(order.items) && order.items.length > 0 && (
+                  <div className="order-items-list">
+                    {order.items.map((item, idx) => (
+                      <div key={`${item.productId || idx}-${idx}`} className="order-item-row">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="order-item-thumb" />
+                        ) : (
+                          <div className="order-item-thumb-placeholder">&#128214;</div>
+                        )}
+                        <div className="order-item-details">
+                          <div className="order-item-name">{item.name}</div>
+                          <div className="order-item-meta">
+                            Qty: {item.quantity} &times; {formatINR(item.price)}
+                            {Number(item.savingsPerUnit || 0) > 0 && (
+                              <span className="muted"> (Saved {formatINR(item.savingsPerUnit)}/ea)</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="order-item-total">
+                          {formatINR(Number(item.price || 0) * Number(item.quantity || 1))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div className="row">
                   <select value={order.status} onChange={(e) => updateStatus(order._id, e.target.value)}>
                     {statuses.map((status) => (
@@ -149,6 +215,7 @@ export default function AdminOrdersPage() {
               </div>
             );
           })}
+
           {!visibleOrders.length && <p className="muted">No orders found for the selected filter.</p>}
         </div>
       </section>

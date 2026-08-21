@@ -1,6 +1,8 @@
 import { clearAuthCookie } from "@/lib/auth";
+import { withErrorHandling } from "@/lib/apiHandler";
 
-export async function POST() {
+export const POST = withErrorHandling(async () => {
   return clearAuthCookie();
-}
+});
+
 

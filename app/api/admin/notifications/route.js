@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { withErrorHandling } from "@/lib/apiHandler";
 import Notification from "@/models/Notification";
 
-export async function GET(request) {
+export const GET = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
@@ -20,9 +22,9 @@ export async function GET(request) {
   ]);
 
   return NextResponse.json({ notifications, unreadCount });
-}
+});
 
-export async function PATCH(request) {
+export const PATCH = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
 
@@ -37,8 +39,12 @@ export async function PATCH(request) {
   if (!id) {
     return NextResponse.json({ error: "Notification id is required" }, { status: 400 });
   }
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return NextResponse.json({ error: "Invalid notification ID" }, { status: 400 });
+  }
 
   const notification = await Notification.findByIdAndUpdate(id, { read: true }, { new: true });
   if (!notification) return NextResponse.json({ error: "Notification not found" }, { status: 404 });
   return NextResponse.json({ success: true, notification });
-}
+});
+

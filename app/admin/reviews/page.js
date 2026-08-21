@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
+import { useToast } from "@/components/ToastProvider";
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState([]);
+  const toast = useToast();
 
   async function load() {
-    const res = await fetch("/api/admin/reviews");
-    const data = await res.json();
-    setReviews(data.reviews || []);
+    try {
+      const res = await fetch("/api/admin/reviews");
+      const data = await res.json();
+      setReviews(data.reviews || []);
+    } catch {
+      toast.error("Failed to load reviews");
+    }
   }
 
   useEffect(() => {
@@ -17,9 +23,20 @@ export default function AdminReviewsPage() {
   }, []);
 
   async function remove(id) {
-    await fetch(`/api/reviews/${id}`, { method: "DELETE" });
-    await load();
+    try {
+      const res = await fetch(`/api/reviews/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete review");
+        return;
+      }
+      toast.info("Review deleted");
+      await load();
+    } catch {
+      toast.error("Failed to delete review");
+    }
   }
+
 
   return (
     <AuthGate role="admin">

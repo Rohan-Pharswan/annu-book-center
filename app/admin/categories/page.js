@@ -2,15 +2,22 @@
 
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
+import { useToast } from "@/components/ToastProvider";
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({ name: "", description: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   async function load() {
-    const res = await fetch("/api/admin/categories");
-    const data = await res.json();
-    setCategories(data.categories || []);
+    try {
+      const res = await fetch("/api/admin/categories");
+      const data = await res.json();
+      setCategories(data.categories || []);
+    } catch {
+      toast.error("Failed to load categories");
+    }
   }
 
   useEffect(() => {
@@ -19,23 +26,47 @@ export default function AdminCategoriesPage() {
 
   async function create(e) {
     e.preventDefault();
-    await fetch("/api/admin/categories", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    });
-    setForm({ name: "", description: "" });
-    await load();
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to create category");
+        return;
+      }
+      toast.success("Category created successfully");
+      setForm({ name: "", description: "" });
+      await load();
+    } catch {
+      toast.error("Failed to create category");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function remove(id) {
-    await fetch("/api/admin/categories", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id })
-    });
-    await load();
+    try {
+      const res = await fetch("/api/admin/categories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete category");
+        return;
+      }
+      toast.info("Category deleted");
+      await load();
+    } catch {
+      toast.error("Failed to delete category");
+    }
   }
+
 
   return (
     <AuthGate role="admin">

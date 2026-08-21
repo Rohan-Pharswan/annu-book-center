@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { withErrorHandling } from "@/lib/apiHandler";
 import Discount from "@/models/Discount";
 import mongoose from "mongoose";
 
-export async function GET(request) {
+export const GET = withErrorHandling(async (request) => {
   await connectDB();
   const { searchParams } = new URL(request.url);
   const scopeType = searchParams.get("scopeType");
@@ -29,9 +30,9 @@ export async function GET(request) {
 
   const discounts = await Discount.find(query).sort({ createdAt: -1 });
   return NextResponse.json({ discounts });
-}
+});
 
-export async function POST(request) {
+export const POST = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
   const body = await request.json();
@@ -70,13 +71,16 @@ export async function POST(request) {
   await connectDB();
   const discount = await Discount.create(payload);
   return NextResponse.json({ success: true, discount }, { status: 201 });
-}
+});
 
-export async function PATCH(request) {
+export const PATCH = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
   const { id, ...update } = await request.json();
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return NextResponse.json({ error: "Invalid discount ID" }, { status: 400 });
+  }
 
   await connectDB();
   const payload = { ...update };
@@ -90,4 +94,5 @@ export async function PATCH(request) {
   const discount = await Discount.findByIdAndUpdate(id, payload, { new: true });
   if (!discount) return NextResponse.json({ error: "Discount not found" }, { status: 404 });
   return NextResponse.json({ success: true, discount });
-}
+});
+

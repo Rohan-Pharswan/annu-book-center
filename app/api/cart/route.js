@@ -1,25 +1,28 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { withErrorHandling } from "@/lib/apiHandler";
 import User from "@/models/User";
 import Discount from "@/models/Discount";
 import { calculateDiscountedPrice, DEFAULT_DELIVERY_CHARGE, getBestDiscountForProduct } from "@/lib/pricing";
 
-export async function GET(request) {
+export const GET = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   await connectDB();
 
   const user = await User.findById(auth.user._id).populate("cart.product");
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
   const discounts = await Discount.find({ active: true }).lean();
 
   let subtotalAmount = 0;
   let discountedSubtotal = 0;
   let totalSavings = 0;
 
-  const validCartItems = user.cart.filter((item) => Boolean(item.product));
+  const validCartItems = user.cart.filter((item) => Boolean(item.product && item.product._id));
   if (validCartItems.length !== user.cart.length) {
-    user.cart = user.cart.filter((item) => Boolean(item.product));
+    user.cart = validCartItems;
     await user.save();
   }
 
@@ -51,9 +54,9 @@ export async function GET(request) {
       totalAmount: Number((discountedSubtotal + deliveryCharge).toFixed(2))
     }
   });
-}
+});
 
-export async function POST(request) {
+export const POST = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   const { productId, quantity = 1 } = await request.json();
@@ -65,37 +68,48 @@ export async function POST(request) {
 
   await connectDB();
   const user = await User.findById(auth.user._id);
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
   const index = user.cart.findIndex((item) => String(item.product) === productId);
   if (index >= 0) user.cart[index].quantity = Math.min(99, Number(user.cart[index].quantity || 1) + qty);
   else user.cart.push({ product: productId, quantity: qty });
 
   await user.save();
   return NextResponse.json({ success: true, cart: user.cart });
-}
+});
 
-export async function PATCH(request) {
+export const PATCH = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   const { productId, quantity } = await request.json();
-  if (!productId || !quantity) {
+  if (!productId || quantity === undefined) {
     return NextResponse.json({ error: "productId and quantity are required" }, { status: 400 });
   }
   const qty = Number(quantity);
-  if (!Number.isInteger(qty) || qty <= 0 || qty > 99) {
-    return NextResponse.json({ error: "quantity must be an integer between 1 and 99" }, { status: 400 });
-  }
 
   await connectDB();
   const user = await User.findById(auth.user._id);
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  if (qty <= 0) {
+    user.cart = user.cart.filter((cartItem) => String(cartItem.product) !== productId);
+    await user.save();
+    return NextResponse.json({ success: true, cart: user.cart });
+  }
+
+  if (!Number.isInteger(qty) || qty > 99) {
+    return NextResponse.json({ error: "quantity must be an integer between 1 and 99" }, { status: 400 });
+  }
+
   const item = user.cart.find((cartItem) => String(cartItem.product) === productId);
   if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
   item.quantity = qty;
   await user.save();
   return NextResponse.json({ success: true, cart: user.cart });
-}
+});
 
-export async function DELETE(request) {
+export const DELETE = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   const { productId } = await request.json();
@@ -103,8 +117,11 @@ export async function DELETE(request) {
 
   await connectDB();
   const user = await User.findById(auth.user._id);
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
   user.cart = user.cart.filter((item) => String(item.product) !== productId);
   await user.save();
 
   return NextResponse.json({ success: true, cart: user.cart });
-}
+});
+

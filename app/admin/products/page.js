@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import { formatINR } from "@/lib/currency";
+import { useToast } from "@/components/ToastProvider";
 
 const initial = {
   name: "",
@@ -41,7 +42,9 @@ function normalizeImageInput(value) {
 }
 
 export default function AdminProductsPage() {
+  const toast = useToast();
   const [products, setProducts] = useState([]);
+
   const [listPagination, setListPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [listPage, setListPage] = useState(1);
   const [listLoading, setListLoading] = useState(false);
@@ -109,6 +112,9 @@ export default function AdminProductsPage() {
     if (data.imageUrl) {
       setForm((prev) => ({ ...prev, images: [data.imageUrl] }));
       setImageData(data.imageUrl);
+      toast.success("Image uploaded successfully");
+    } else {
+      toast.error(data.error || "Image upload failed");
     }
   }
 
@@ -194,8 +200,13 @@ export default function AdminProductsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) return;
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Failed to update product");
+          return;
+        }
         await applyProductDiscount(editingId);
+        toast.success("Product updated successfully");
       } else {
         const res = await fetch("/api/products", {
           method: "POST",
@@ -203,20 +214,38 @@ export default function AdminProductsPage() {
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (!res.ok || !data?.product?._id) return;
+        if (!res.ok || !data?.product?._id) {
+          toast.error(data.error || data.errors?.[0] || "Failed to create product");
+          return;
+        }
         await applyProductDiscount(data.product._id);
+        toast.success("Product created successfully");
       }
       resetForm();
       await Promise.all([loadProducts(listPage), loadFinderProducts(finderQuery, finderPage)]);
+    } catch {
+      toast.error("Failed to save product");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function deleteProduct(id) {
-    await fetch(`/api/products/${id}`, { method: "DELETE" });
-    await Promise.all([loadProducts(listPage), loadFinderProducts(finderQuery, finderPage)]);
+    const confirmed = window.confirm("Delete this product permanently?");
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.info("Product deleted");
+      } else {
+        toast.error("Failed to delete product");
+      }
+      await Promise.all([loadProducts(listPage), loadFinderProducts(finderQuery, finderPage)]);
+    } catch {
+      toast.error("Failed to delete product");
+    }
   }
+
 
   async function startEdit(item) {
     setEditingId(item._id);

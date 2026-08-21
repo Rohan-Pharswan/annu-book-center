@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { bookingSchema, validate } from "@/lib/validators";
+import { withErrorHandling } from "@/lib/apiHandler";
 import Booking from "@/models/Booking";
 
-export async function GET(request) {
+export const GET = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   await connectDB();
@@ -12,9 +13,9 @@ export async function GET(request) {
   const query = auth.user.role === "admin" ? {} : { userId: auth.user._id };
   const bookings = await Booking.find(query).sort({ createdAt: -1 });
   return NextResponse.json({ bookings });
-}
+});
 
-export async function POST(request) {
+export const POST = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   const body = await request.json();
@@ -29,5 +30,6 @@ export async function POST(request) {
     status: "Pending"
   });
   return NextResponse.json({ success: true, booking }, { status: 201 });
-}
+});
+
 

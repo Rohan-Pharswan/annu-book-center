@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { withErrorHandling } from "@/lib/apiHandler";
 import Order from "@/models/Order";
 
-export async function PATCH(request, { params }) {
+export const PATCH = withErrorHandling(async (request, { params }) => {
   const admin = await requireAdmin(request);
   if (!admin.ok) return NextResponse.json({ error: admin.message }, { status: admin.status });
+
+  const { id } = await params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return NextResponse.json({ error: "Invalid order ID" }, { status: 400 });
+  }
 
   const { emailVerifiedByAdmin, phoneVerifiedByAdmin } = await request.json();
   const update = {};
@@ -18,7 +25,8 @@ export async function PATCH(request, { params }) {
   }
 
   await connectDB();
-  const order = await Order.findByIdAndUpdate(params.id, update, { new: true });
+  const order = await Order.findByIdAndUpdate(id, update, { new: true });
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   return NextResponse.json({ success: true, order });
-}
+});
+

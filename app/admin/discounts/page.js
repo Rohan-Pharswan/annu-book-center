@@ -2,46 +2,89 @@
 
 import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
+import { useToast } from "@/components/ToastProvider";
 
 const initial = { scopeType: "category", productId: "", category: "", discountType: "percentage", value: 10, active: true };
 
 export default function AdminDiscountsPage() {
   const [discounts, setDiscounts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [form, setForm] = useState(initial);
+  const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   async function load() {
-    const res = await fetch("/api/discounts");
-    const data = await res.json();
-    setDiscounts(data.discounts || []);
+    try {
+      const res = await fetch("/api/discounts");
+      const data = await res.json();
+      setDiscounts(data.discounts || []);
+    } catch {
+      toast.error("Failed to load discounts");
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json();
+      setCategories(data.categories || []);
+    } catch {
+      // Ignore
+    }
   }
 
   useEffect(() => {
     load();
+    loadCategories();
   }, []);
 
   async function create(e) {
     e.preventDefault();
-    await fetch("/api/discounts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        value: Number(form.value),
-        percentage: form.discountType === "percentage" ? Number(form.value) : undefined
-      })
-    });
-    setForm(initial);
-    await load();
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/discounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          value: Number(form.value),
+          percentage: form.discountType === "percentage" ? Number(form.value) : undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to create discount");
+        return;
+      }
+      toast.success("Discount created successfully");
+      setForm(initial);
+      await load();
+    } catch {
+      toast.error("Failed to create discount");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function toggle(discount) {
-    await fetch("/api/discounts", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: discount._id, active: !discount.active })
-    });
-    await load();
+    try {
+      const res = await fetch("/api/discounts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: discount._id, active: !discount.active })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update discount status");
+        return;
+      }
+      toast.info(`Discount ${discount.active ? "disabled" : "enabled"}`);
+      await load();
+    } catch {
+      toast.error("Failed to update discount status");
+    }
   }
+
 
   return (
     <AuthGate role="admin">

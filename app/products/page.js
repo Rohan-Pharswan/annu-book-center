@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import { useToast } from "@/components/ToastProvider";
 
-export default function HomePage() {
+export default function ProductsCatalogPage() {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
 
@@ -22,7 +23,7 @@ export default function HomePage() {
         setCategories(data.categories || []);
       }
     } catch {
-      // Fallback if category API fails
+      // Ignored fallback
     }
   }
 
@@ -33,12 +34,13 @@ export default function HomePage() {
         q,
         category,
         page: String(page),
-        limit: "8"
+        limit: "12"
       });
       const res = await fetch(`/api/products?${params.toString()}`);
       const data = await res.json();
       setItems(data.items || []);
       setPages(data.pagination?.pages || 1);
+      setTotal(data.pagination?.total || 0);
     } catch {
       toast.error("Failed to load products");
     } finally {
@@ -88,17 +90,18 @@ export default function HomePage() {
     }
   }
 
-
   return (
     <section>
       <div className="hero">
-        <h1>Annu Book Store</h1>
-        <p className="muted">Books, stationery, and school essentials for local customers.</p>
+        <h1>All Products Catalog</h1>
+        <p className="muted">
+          Browse our complete collection of books, stationery, and learning supplies ({total} items).
+        </p>
       </div>
 
       <div className="filters">
         <input
-          placeholder="Search by product name"
+          placeholder="Search by book name or category..."
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
@@ -126,7 +129,7 @@ export default function HomePage() {
       </div>
 
       {loading ? (
-        <div className="grid" aria-label="Loading products" aria-busy="true">
+        <div className="grid" aria-label="Loading catalog products" aria-busy="true">
           {Array(8)
             .fill(0)
             .map((_, i) => (
@@ -136,7 +139,7 @@ export default function HomePage() {
       ) : items.length === 0 ? (
         <div className="panel stack" style={{ textAlign: "center", padding: "40px 20px" }}>
           <h3>No products found</h3>
-          <p className="muted">We couldn't find any products matching your search or category filter.</p>
+          <p className="muted">No products match your current search or category criteria.</p>
           {(q || category) && (
             <button
               type="button"
@@ -191,5 +194,4 @@ export default function HomePage() {
     </section>
   );
 }
-
 
