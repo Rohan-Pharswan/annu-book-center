@@ -4,6 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import User from "@/models/User";
+
 
 export const GET = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);

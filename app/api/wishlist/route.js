@@ -3,6 +3,7 @@ import { connectDB } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import User from "@/models/User";
+import Product from "@/models/Product";
 import Discount from "@/models/Discount";
 import { calculateDiscountedPrice, getBestDiscountForProduct } from "@/lib/pricing";
 
@@ -13,6 +14,8 @@ export const GET = withErrorHandling(async (request) => {
   await connectDB();
   const user = await User.findById(auth.user._id).populate("wishlist");
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!Array.isArray(user.wishlist)) user.wishlist = [];
+
 
   // Filter out any products that have been deleted from the database
   const validProducts = (user.wishlist || []).filter((product) => Boolean(product && product._id));
@@ -20,7 +23,7 @@ export const GET = withErrorHandling(async (request) => {
   // If there were dangling/deleted product references, prune them from user's wishlist in DB
   if (validProducts.length !== (user.wishlist || []).length) {
     user.wishlist = validProducts.map((p) => p._id);
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
   }
 
   const discounts = await Discount.find({ active: true }).lean();

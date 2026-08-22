@@ -130,7 +130,7 @@ export const POST = withErrorHandling(async (request) => {
     });
 
     user.cart = [];
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
     await Notification.create({
       type: "order_placed",
       title: "New order placed",

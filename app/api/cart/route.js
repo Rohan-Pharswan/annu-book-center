@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import User from "@/models/User";
+import Product from "@/models/Product";
 import Discount from "@/models/Discount";
 import { calculateDiscountedPrice, DEFAULT_DELIVERY_CHARGE, getBestDiscountForProduct } from "@/lib/pricing";
 
@@ -13,6 +15,7 @@ export const GET = withErrorHandling(async (request) => {
 
   const user = await User.findById(auth.user._id).populate("cart.product");
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!Array.isArray(user.cart)) user.cart = [];
 
   const discounts = await Discount.find({ active: true }).lean();
 
@@ -23,7 +26,7 @@ export const GET = withErrorHandling(async (request) => {
   const validCartItems = user.cart.filter((item) => Boolean(item.product && item.product._id));
   if (validCartItems.length !== user.cart.length) {
     user.cart = validCartItems;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
   }
 
   const cart = validCartItems.map((item) => {
@@ -61,6 +64,9 @@ export const POST = withErrorHandling(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   const { productId, quantity = 1 } = await request.json();
   if (!productId) return NextResponse.json({ error: "productId is required" }, { status: 400 });
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    return NextResponse.json({ error: "Invalid product ID" }, { status: 400 });
+  }
   const qty = Number(quantity);
   if (!Number.isInteger(qty) || qty <= 0 || qty > 99) {
     return NextResponse.json({ error: "quantity must be an integer between 1 and 99" }, { status: 400 });
@@ -69,12 +75,13 @@ export const POST = withErrorHandling(async (request) => {
   await connectDB();
   const user = await User.findById(auth.user._id);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!Array.isArray(user.cart)) user.cart = [];
 
   const index = user.cart.findIndex((item) => String(item.product) === productId);
   if (index >= 0) user.cart[index].quantity = Math.min(99, Number(user.cart[index].quantity || 1) + qty);
-  else user.cart.push({ product: productId, quantity: qty });
+  else user.cart.push({ product: new mongoose.Types.ObjectId(productId), quantity: qty });
 
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
   return NextResponse.json({ success: true, cart: user.cart });
 });
 
@@ -90,10 +97,11 @@ export const PATCH = withErrorHandling(async (request) => {
   await connectDB();
   const user = await User.findById(auth.user._id);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!Array.isArray(user.cart)) user.cart = [];
 
   if (qty <= 0) {
     user.cart = user.cart.filter((cartItem) => String(cartItem.product) !== productId);
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
     return NextResponse.json({ success: true, cart: user.cart });
   }
 
@@ -105,7 +113,7 @@ export const PATCH = withErrorHandling(async (request) => {
   if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
   item.quantity = qty;
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
   return NextResponse.json({ success: true, cart: user.cart });
 });
 
@@ -118,10 +126,12 @@ export const DELETE = withErrorHandling(async (request) => {
   await connectDB();
   const user = await User.findById(auth.user._id);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!Array.isArray(user.cart)) user.cart = [];
 
   user.cart = user.cart.filter((item) => String(item.product) !== productId);
-  await user.save();
+  await user.save({ validateModifiedOnly: true });
 
   return NextResponse.json({ success: true, cart: user.cart });
 });
+
 

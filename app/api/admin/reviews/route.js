@@ -3,6 +3,9 @@ import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Review from "@/models/Review";
+import User from "@/models/User";
+import Product from "@/models/Product";
+
 
 export const GET = withErrorHandling(async (request) => {
   const admin = await requireAdmin(request);

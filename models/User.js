@@ -1,13 +1,16 @@
 import mongoose, { Schema } from "mongoose";
+import "./Product.js";
+
+
 
 const AddressSchema = new Schema(
   {
     label: { type: String, default: "Home" },
-    line1: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String, required: true },
-    postalCode: { type: String, required: true },
-    phone: { type: String, required: true }
+    line1: { type: String, default: "" },
+    city: { type: String, default: "" },
+    state: { type: String, default: "" },
+    postalCode: { type: String, default: "" },
+    phone: { type: String, default: "" }
   },
   { _id: true }
 );

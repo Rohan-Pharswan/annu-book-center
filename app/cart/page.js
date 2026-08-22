@@ -315,41 +315,42 @@ export default function CartPage() {
                   <div className="grid two">
                     <input
                       placeholder="Label (e.g. Home, Work)"
-                      value={newAddress.label}
+                      value={newAddress?.label || ""}
                       onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
                       required
                     />
                     <input
                       placeholder="Phone (e.g. 9876543210)"
-                      value={newAddress.phone}
+                      value={newAddress?.phone || ""}
                       onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
                       required
                     />
                     <input
                       placeholder="Street / Flat / Line 1"
-                      value={newAddress.line1}
+                      value={newAddress?.line1 || ""}
                       onChange={(e) => setNewAddress({ ...newAddress, line1: e.target.value })}
                       required
                     />
                     <input
                       placeholder="City"
-                      value={newAddress.city}
+                      value={newAddress?.city || ""}
                       onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                       required
                     />
                     <input
                       placeholder="State"
-                      value={newAddress.state}
+                      value={newAddress?.state || ""}
                       onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                       required
                     />
                     <input
                       placeholder="Postal / PIN Code"
-                      value={newAddress.postalCode}
+                      value={newAddress?.postalCode || ""}
                       onChange={(e) => setNewAddress({ ...newAddress, postalCode: e.target.value })}
                       required
                     />
                   </div>
+
                   <button className="btn" style={{ alignSelf: "flex-start" }} disabled={addressSubmitting}>
                     {addressSubmitting ? "Saving Address..." : "Save & Use Address"}
                   </button>

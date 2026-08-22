@@ -5,7 +5,9 @@ import { requireAdmin } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Order from "@/models/Order";
 import Product from "@/models/Product";
+import User from "@/models/User";
 import Notification from "@/models/Notification";
+
 
 const ALLOWED = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
 

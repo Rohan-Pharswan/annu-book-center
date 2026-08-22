@@ -113,11 +113,12 @@ export default function ProfilePage() {
                 <div className="row" style={{ gap: "10px" }}>
                   <input
                     id="profile-name"
-                    value={name}
+                    value={name || ""}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name"
                     style={{ maxWidth: "360px" }}
                   />
+
                   <button className="btn" onClick={saveName}>
                     Save Changes
                   </button>
@@ -173,7 +174,7 @@ export default function ProfilePage() {
                     <input
                       id="new-label"
                       placeholder="e.g. Home, Office"
-                      value={address.label}
+                      value={address?.label || ""}
                       onChange={(e) => setAddress({ ...address, label: e.target.value })}
                       required
                     />
@@ -183,7 +184,7 @@ export default function ProfilePage() {
                     <input
                       id="new-phone"
                       placeholder="10-digit mobile number"
-                      value={address.phone}
+                      value={address?.phone || ""}
                       onChange={(e) => setAddress({ ...address, phone: e.target.value })}
                       required
                     />
@@ -193,7 +194,7 @@ export default function ProfilePage() {
                     <input
                       id="new-line1"
                       placeholder="House/Flat No, Street"
-                      value={address.line1}
+                      value={address?.line1 || ""}
                       onChange={(e) => setAddress({ ...address, line1: e.target.value })}
                       required
                     />
@@ -203,7 +204,7 @@ export default function ProfilePage() {
                     <input
                       id="new-city"
                       placeholder="City"
-                      value={address.city}
+                      value={address?.city || ""}
                       onChange={(e) => setAddress({ ...address, city: e.target.value })}
                       required
                     />
@@ -213,7 +214,7 @@ export default function ProfilePage() {
                     <input
                       id="new-state"
                       placeholder="State"
-                      value={address.state}
+                      value={address?.state || ""}
                       onChange={(e) => setAddress({ ...address, state: e.target.value })}
                       required
                     />
@@ -223,11 +224,12 @@ export default function ProfilePage() {
                     <input
                       id="new-postal"
                       placeholder="PIN code"
-                      value={address.postalCode}
+                      value={address?.postalCode || ""}
                       onChange={(e) => setAddress({ ...address, postalCode: e.target.value })}
                       required
                     />
                   </div>
+
                 </div>
                 <button
                   type="submit"

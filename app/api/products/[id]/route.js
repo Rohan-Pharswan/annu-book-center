@@ -6,7 +6,9 @@ import { validate, productSchema } from "@/lib/validators";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Product from "@/models/Product";
 import Review from "@/models/Review";
+import User from "@/models/User";
 import { calculateDiscountedPrice, getBestDiscountForProduct } from "@/lib/pricing";
+
 import Discount from "@/models/Discount";
 
 function normalizeImageUrl(value) {

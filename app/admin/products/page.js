@@ -320,21 +320,62 @@ export default function AdminProductsPage() {
             <input
               placeholder='Image URL (e.g. "https://example.com/image.jpg")'
               value={imageData}
-              onChange={(e) => setImageData(e.target.value)}
-            />
-          ) : (
-            <input
-              type="file"
-              accept="image/*"
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () => setImageData(String(reader.result || ""));
-                reader.readAsDataURL(file);
+                setImageData(e.target.value);
+                setForm((prev) => ({ ...prev, images: [e.target.value] }));
               }}
             />
+          ) : (
+            <div className="stack" style={{ gap: "8px" }}>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = String(reader.result || "");
+                    setImageData(result);
+                    setForm((prev) => ({ ...prev, images: [result] }));
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+              <p className="muted" style={{ fontSize: "0.82rem", margin: 0 }}>
+                Select an image (PNG, JPG, WEBP) from your computer or device.
+              </p>
+            </div>
           )}
+
+          {imageData ? (
+            <div className="panel row align-center" style={{ gap: "16px", padding: "12px", background: "var(--surface)" }}>
+              <img
+                src={imageData}
+                alt="Product preview"
+                style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "8px", border: "1px solid var(--border)" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+              <div className="stack" style={{ gap: "4px" }}>
+                <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Image Ready for Product</span>
+                <span className="muted" style={{ fontSize: "0.78rem" }}>
+                  {imageData.startsWith("data:") ? "Image loaded from your device" : "Direct image URL"}
+                </span>
+                <button
+                  type="button"
+                  className="ghost-btn"
+                  style={{ alignSelf: "flex-start", padding: "2px 8px", fontSize: "0.75rem" }}
+                  onClick={() => {
+                    setImageData("");
+                    setForm((prev) => ({ ...prev, images: [] }));
+                  }}
+                >
+                  Remove Image
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="panel stack">
             <label>
               <input
@@ -364,9 +405,6 @@ export default function AdminProductsPage() {
             </div>
           </div>
           <div className="row">
-            <button type="button" className="ghost-btn" onClick={uploadImage}>
-              Upload Image
-            </button>
             <button className="btn" disabled={submitting}>
               {editingId ? "Save Product" : "Add Product"}
             </button>
