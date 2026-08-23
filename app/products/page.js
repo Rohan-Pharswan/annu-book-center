@@ -93,9 +93,9 @@ export default function ProductsCatalogPage() {
   return (
     <section>
       <div className="hero">
-        <h1>All Products Catalog</h1>
+        <h1>Annu Book Store — Product Prices &amp; Details</h1>
         <p className="muted">
-          Browse our complete collection of books, stationery, and learning supplies ({total} items).
+          Browse our complete store inventory, real-time prices, stock availability, and special discount offers ({total} items).
         </p>
       </div>
 

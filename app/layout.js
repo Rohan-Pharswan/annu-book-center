@@ -4,10 +4,10 @@ import ToastProvider from "@/components/ToastProvider";
 
 export const metadata = {
   title: {
-    default: "Annu Book Store — Books, Stationery & Learning Supplies",
+    default: "Annu Book Store — Product Prices, Details & Store Inventory",
     template: "%s | Annu Book Store"
   },
-  description: "Browse and order educational books, competitive exam guides, stationery, school and office essentials with cash-on-delivery and local store consultations.",
+  description: "Browse live store inventory, check real-time product prices, stock availability, educational books, stationery, and learning supplies at Annu Book Store.",
   keywords: ["books", "stationery", "school supplies", "educational books", "Annu Book Store"],
   authors: [{ name: "Annu Book Store" }],
   openGraph: {

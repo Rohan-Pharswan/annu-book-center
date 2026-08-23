@@ -147,6 +147,12 @@ export default function AdminOrdersPage() {
                 <p>
                   <strong>{order.userId?.name}</strong> ({order.userId?.email})
                 </p>
+                <div className="row" style={{ gap: "8px", alignItems: "center", margin: "4px 0 8px" }}>
+                  <span className="muted">Fulfillment:</span>
+                  <span className="badge" style={{ fontWeight: 700 }}>
+                    {order.fulfillmentType === "store_visit" ? "🏬 Store Visit & In-Store Purchase" : "🚚 Doorstep Delivery (COD)"}
+                  </span>
+                </div>
                 <p>Date: {new Date(order.createdAt).toLocaleDateString()}</p>
                 <p>Time: {new Date(order.createdAt).toLocaleTimeString()}</p>
                 <p>Phone: {order.customerPhone || order.address?.phone || "N/A"}</p>
@@ -155,10 +161,28 @@ export default function AdminOrdersPage() {
                   Email Verified: {order.emailVerifiedByAdmin ? "Yes" : "No"} | Phone Verified:{" "}
                   {order.phoneVerifiedByAdmin ? "Yes" : "No"}
                 </p>
+                {order.fulfillmentType === "store_visit" ? (
+                  <div className="panel stack" style={{ background: "var(--surface-muted, rgba(0,0,0,0.02))", padding: "8px 12px", margin: "6px 0" }}>
+                    <p style={{ margin: 0 }}>
+                      <strong>🏬 Store Visit Planned:</strong> {order.storeVisit?.visitDate || "Scheduled"} ({order.storeVisit?.visitTime || "Store Hours"})
+                    </p>
+                    <p className="muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                      Location: {order.storeVisit?.storeLocation || "Annu Book Center, Dehradun"}
+                    </p>
+                  </div>
+                ) : order.address ? (
+                  <p>
+                    <strong>Delivery Address:</strong> {order.address.label} &mdash; {order.address.line1}, {order.address.city}, {order.address.state} - {order.address.postalCode}
+                  </p>
+                ) : null}
                 <p>Subtotal: {formatINR(subtotalAmount)}</p>
                 <p>You Saved: {formatINR(totalSavings)}</p>
-                <p>Delivery Charge: {formatINR(deliveryCharge)}</p>
+                <p>
+                  Delivery Charge:{" "}
+                  {order.fulfillmentType === "store_visit" || deliveryCharge === 0 ? "₹0 (Store Visit)" : formatINR(deliveryCharge)}
+                </p>
                 <p><strong>Total: {formatINR(order.totalAmount)}</strong></p>
+                <p>Payment Method: {order.paymentMethod || (order.fulfillmentType === "store_visit" ? "Pay at Store" : "Cash on Delivery")}</p>
                 <p>Status: <span className="status">{order.status}</span></p>
 
                 {/* Ordered Items Breakdown */}

@@ -42,14 +42,43 @@ export const POST = withErrorHandling(async (request) => {
 
   checkoutInFlight.add(userId);
   try {
-    const { addressId } = await request.json();
+    const body = await request.json();
+    const fulfillmentType = body.fulfillmentType === "store_visit" ? "store_visit" : "doorstep";
 
     await connectDB();
     const user = await User.findById(auth.user._id).populate("cart.product");
     if (!user.cart.length) return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
 
-    const address = user.addresses.id(addressId);
-    if (!address) return NextResponse.json({ error: "Invalid address" }, { status: 400 });
+    let address = null;
+    let storeVisit = null;
+    let customerPhone = user.phone || "";
+
+    if (fulfillmentType === "doorstep") {
+      if (!body.addressId) {
+        return NextResponse.json({ error: "Please select a delivery address for doorstep delivery" }, { status: 400 });
+      }
+      address = user.addresses.id(body.addressId);
+      if (!address) return NextResponse.json({ error: "Invalid delivery address" }, { status: 400 });
+      customerPhone = address.phone || customerPhone;
+    } else {
+      // Store visit
+      const visitDate = (body.visitDate || "").trim();
+      if (!visitDate) {
+        return NextResponse.json({ error: "Please select a preferred date for your store visit" }, { status: 400 });
+      }
+      const visitTime = (body.visitTime || "During Store Hours (10:00 AM - 8:00 PM)").trim();
+      storeVisit = {
+        visitDate,
+        visitTime,
+        storeLocation: "Annu Book Center, Dehradun"
+      };
+      if (body.customerPhone) {
+        customerPhone = String(body.customerPhone).trim();
+      } else if (body.addressId) {
+        const addr = user.addresses.id(body.addressId);
+        if (addr?.phone) customerPhone = addr.phone;
+      }
+    }
 
     const discounts = await Discount.find({ active: true });
     let subtotalAmount = 0;
@@ -110,34 +139,40 @@ export const POST = withErrorHandling(async (request) => {
       updatedProducts.push({ productId: product._id, quantity });
     }
 
-    const deliveryCharge = DEFAULT_DELIVERY_CHARGE;
+    const deliveryCharge = fulfillmentType === "store_visit" ? 0 : DEFAULT_DELIVERY_CHARGE;
     const totalAmount = Number((discountedSubtotal + deliveryCharge).toFixed(2));
 
     const order = await Order.create({
       userId: auth.user._id,
       items,
+      fulfillmentType,
+      storeVisit,
       subtotalAmount: Number(subtotalAmount.toFixed(2)),
       totalSavings: Number(totalSavings.toFixed(2)),
       deliveryCharge,
       totalAmount,
-      address,
+      address: address ? address.toObject() : undefined,
       customerEmail: user.email || "",
-      customerPhone: address.phone || "",
+      customerPhone: customerPhone || "",
       emailVerifiedByAdmin: false,
       phoneVerifiedByAdmin: false,
       status: "Pending",
-      paymentMethod: "Cash on Delivery"
+      paymentMethod: fulfillmentType === "store_visit" ? "Pay at Store" : "Cash on Delivery"
     });
 
     user.cart = [];
     await user.save({ validateModifiedOnly: true });
     await Notification.create({
       type: "order_placed",
-      title: "New order placed",
-      message: `${user.name || "Customer"} placed order #${String(order._id).slice(-6)} for \u20B9${totalAmount.toFixed(2)}`,
+      title: fulfillmentType === "store_visit" ? "Store visit reservation placed" : "New doorstep order placed",
+      message:
+        fulfillmentType === "store_visit"
+          ? `${user.name || "Customer"} reserved books for Store Visit on ${storeVisit.visitDate} (Order #${String(order._id).slice(-6)} - \u20B9${totalAmount.toFixed(2)})`
+          : `${user.name || "Customer"} placed doorstep order #${String(order._id).slice(-6)} for \u20B9${totalAmount.toFixed(2)}`,
       meta: {
         orderId: order._id,
         userId: user._id,
+        fulfillmentType,
         status: order.status,
         totalAmount
       }

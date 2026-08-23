@@ -101,6 +101,13 @@ export default function OrdersPage() {
                   )}
 
                   <div className="stack" style={{ fontSize: "0.92rem", gap: "6px" }}>
+                    <div className="row" style={{ gap: "8px", alignItems: "center" }}>
+                      <span className="muted">Fulfillment:</span>
+                      <span className="badge" style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+                        {order.fulfillmentType === "store_visit" ? "🏬 Store Visit & In-Store Purchase" : "🚚 Doorstep Delivery (COD)"}
+                      </span>
+                    </div>
+
                     <div className="row between">
                       <span className="muted">Subtotal:</span>
                       <span>{formatINR(subtotalAmount)}</span>
@@ -112,18 +119,39 @@ export default function OrdersPage() {
                       </div>
                     )}
                     <div className="row between">
-                      <span className="muted">Delivery Fee (COD):</span>
-                      <span>{formatINR(deliveryCharge)}</span>
+                      <span className="muted">
+                        {order.fulfillmentType === "store_visit" ? "Delivery Charge (Store Visit):" : "Delivery Fee (COD):"}
+                      </span>
+                      <span>
+                        {order.fulfillmentType === "store_visit" || deliveryCharge === 0 ? (
+                          <span style={{ color: "var(--success)", fontWeight: 600 }}>FREE (₹0)</span>
+                        ) : (
+                          formatINR(deliveryCharge)
+                        )}
+                      </span>
                     </div>
                     <div className="row between" style={{ fontWeight: 800, fontSize: "1.05rem", marginTop: "4px" }}>
                       <span>Total Amount:</span>
                       <span>{formatINR(order.totalAmount)}</span>
                     </div>
-                    <p style={{ marginTop: "6px" }}>
-                      <strong>Delivery to:</strong> {order.address?.label} ({order.address?.phone}) &mdash;{" "}
-                      {order.address?.line1}, {order.address?.city}, {order.address?.state} - {order.address?.postalCode}
-                    </p>
-                    <p className="muted">Payment Method: {order.paymentMethod}</p>
+
+                    {order.fulfillmentType === "store_visit" ? (
+                      <div className="panel stack" style={{ marginTop: "6px", background: "var(--surface-muted, rgba(0,0,0,0.02))", padding: "10px" }}>
+                        <p style={{ margin: 0 }}>
+                          <strong>🏬 Store Visit Planned:</strong> {order.storeVisit?.visitDate || "Scheduled"} &bull; Slot: {order.storeVisit?.visitTime || "Store Hours"}
+                        </p>
+                        <p className="muted" style={{ margin: 0, fontSize: "0.82rem" }}>
+                          Location: {order.storeVisit?.storeLocation || "Annu Book Center, Dehradun"}
+                        </p>
+                      </div>
+                    ) : order.address ? (
+                      <p style={{ marginTop: "6px" }}>
+                        <strong>Delivery to:</strong> {order.address?.label} ({order.address?.phone || order.customerPhone}) &mdash;{" "}
+                        {order.address?.line1}, {order.address?.city}, {order.address?.state} - {order.address?.postalCode}
+                      </p>
+                    ) : null}
+
+                    <p className="muted" style={{ margin: "2px 0 0" }}>Payment Method: {order.paymentMethod || "Cash on Delivery"}</p>
                   </div>
                 </div>
               );

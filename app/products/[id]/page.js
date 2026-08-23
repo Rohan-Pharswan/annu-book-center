@@ -103,7 +103,16 @@ export default function ProductDetailPage() {
   const hasDiscount = Number(product.savings || 0) > 0;
 
   return (
-    <section className="grid detail">
+    <section className="stack" style={{ gap: "20px" }}>
+      <div className="row" style={{ gap: "8px", alignItems: "center", fontSize: "0.88rem" }}>
+        <Link href="/products" className="muted" style={{ textDecoration: "none" }}>
+          &larr; Annu Book Store Product Prices &amp; Details
+        </Link>
+        <span className="muted">/</span>
+        <span>{product.name}</span>
+      </div>
+
+      <div className="grid detail">
       <div>
         {imageUrl ? (
           <img
@@ -215,6 +224,7 @@ export default function ProductDetailPage() {
             <p className="muted">No reviews yet for this product. Be the first to leave a review!</p>
           )}
         </div>
+      </div>
       </div>
     </section>
   );

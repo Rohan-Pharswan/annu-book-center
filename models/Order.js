@@ -25,15 +25,30 @@ const AddressSnapshotSchema = new Schema(
   { _id: false }
 );
 
+const StoreVisitSchema = new Schema(
+  {
+    visitDate: { type: String, default: "" },
+    visitTime: { type: String, default: "" },
+    storeLocation: { type: String, default: "Annu Book Center, Dehradun" }
+  },
+  { _id: false }
+);
+
 const OrderSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     items: [OrderItemSchema],
+    fulfillmentType: {
+      type: String,
+      enum: ["doorstep", "store_visit"],
+      default: "doorstep"
+    },
+    storeVisit: { type: StoreVisitSchema, default: null },
     subtotalAmount: { type: Number, required: true, min: 0, default: 0 },
     totalSavings: { type: Number, required: true, min: 0, default: 0 },
     deliveryCharge: { type: Number, required: true, min: 0, default: 100 },
     totalAmount: { type: Number, required: true, min: 0 },
-    address: { type: AddressSnapshotSchema, required: true },
+    address: { type: AddressSnapshotSchema, required: false },
     customerEmail: { type: String, default: "" },
     customerPhone: { type: String, default: "" },
     emailVerifiedByAdmin: { type: Boolean, default: false },
