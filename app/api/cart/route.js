@@ -13,11 +13,13 @@ export const GET = withErrorHandling(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
   await connectDB();
 
-  const user = await User.findById(auth.user._id).populate("cart.product");
+  const [user, discounts] = await Promise.all([
+    User.findById(auth.user._id).populate("cart.product"),
+    Discount.find({ active: true }).lean()
+  ]);
+
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   if (!Array.isArray(user.cart)) user.cart = [];
-
-  const discounts = await Discount.find({ active: true }).lean();
 
   let subtotalAmount = 0;
   let discountedSubtotal = 0;

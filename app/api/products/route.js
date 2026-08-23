@@ -52,12 +52,12 @@ export const GET = withErrorHandling(async (request) => {
   }
   if (category) query.category = category;
 
-  const [items, total] = await Promise.all([
+  const [items, total, discounts] = await Promise.all([
     Product.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    Product.countDocuments(query)
+    Product.countDocuments(query),
+    Discount.find({ active: true }).lean()
   ]);
 
-  const discounts = await Discount.find({ active: true }).lean();
   const data = items.map((item) => {
     const productDiscount = getBestDiscountForProduct(item, discounts);
     const pricing = calculateDiscountedPrice(item.price, productDiscount);

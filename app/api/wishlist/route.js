@@ -11,11 +11,13 @@ export const GET = withErrorHandling(async (request) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
 
-  await connectDB();
-  const user = await User.findById(auth.user._id).populate("wishlist");
+  const [user, discounts] = await Promise.all([
+    User.findById(auth.user._id).populate("wishlist"),
+    Discount.find({ active: true }).lean()
+  ]);
+
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
   if (!Array.isArray(user.wishlist)) user.wishlist = [];
-
 
   // Filter out any products that have been deleted from the database
   const validProducts = (user.wishlist || []).filter((product) => Boolean(product && product._id));
@@ -25,8 +27,6 @@ export const GET = withErrorHandling(async (request) => {
     user.wishlist = validProducts.map((p) => p._id);
     await user.save({ validateModifiedOnly: true });
   }
-
-  const discounts = await Discount.find({ active: true }).lean();
   const wishlist = validProducts.map((product) => {
     const item = product.toObject ? product.toObject() : product;
     return {

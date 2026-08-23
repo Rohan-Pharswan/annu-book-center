@@ -8,10 +8,12 @@ const DiscountSchema = new Schema(
     discountType: { type: String, enum: ["percentage", "flat"], default: "percentage" },
     percentage: { type: Number, min: 1, max: 90 },
     value: { type: Number, min: 1 },
-    active: { type: Boolean, default: true }
+    active: { type: Boolean, default: true, index: true }
   },
   { timestamps: true }
 );
+
+DiscountSchema.index({ active: 1 });
 
 const Discount = mongoose.models.Discount || mongoose.model("Discount", DiscountSchema);
 export default Discount;
