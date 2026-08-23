@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatINR } from "@/lib/currency";
 import { useToast } from "@/components/ToastProvider";
+import ContactStore from "@/components/ContactStore";
+import { STORE_CONFIG } from "@/lib/storeConfig";
 
 const emptyAddress = { label: "Home", line1: "", city: "", state: "", postalCode: "", phone: "" };
 
@@ -17,7 +19,7 @@ export default function CartPage() {
     subtotalAmount: 0,
     discountedSubtotal: 0,
     totalSavings: 0,
-    deliveryCharge: 100,
+    deliveryCharge: 0,
     totalAmount: 0
   });
   const [addresses, setAddresses] = useState([]);
@@ -37,8 +39,8 @@ export default function CartPage() {
   const [visitTime, setVisitTime] = useState("10:00 AM - 1:00 PM");
   const [storeVisitPhone, setStoreVisitPhone] = useState("");
 
-  const activeDeliveryFee = fulfillmentType === "store_visit" ? 0 : Number(pricing.deliveryCharge || 100);
-  const activeTotalAmount = Number((pricing.discountedSubtotal + activeDeliveryFee).toFixed(2));
+  const activeDeliveryFee = 0;
+  const activeTotalAmount = Number(pricing.discountedSubtotal.toFixed(2));
 
   async function loadCart() {
     try {
@@ -309,21 +311,26 @@ export default function CartPage() {
                 )}
                 <div className="row between">
                   <span className="muted">
-                    {fulfillmentType === "store_visit" ? "Delivery Fee (Store Visit):" : "Delivery Fee (Doorstep COD):"}
+                    {fulfillmentType === "store_visit" ? "Delivery Fee (Store Pickup):" : "Delivery Charge (Home Delivery):"}
                   </span>
                   <span>
                     {fulfillmentType === "store_visit" ? (
                       <span style={{ color: "var(--success)", fontWeight: 600 }}>FREE (₹0)</span>
                     ) : (
-                      formatINR(activeDeliveryFee)
+                      <span style={{ color: "var(--primary)", fontWeight: 600 }}>To be confirmed</span>
                     )}
                   </span>
                 </div>
                 <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "8px 0" }} />
                 <div className="row between" style={{ fontSize: "1.2rem", fontWeight: 800 }}>
-                  <span>Total Amount:</span>
+                  <span>{fulfillmentType === "doorstep" ? "Books Subtotal (Payable):" : "Total Amount:"}</span>
                   <span>{formatINR(activeTotalAmount)}</span>
                 </div>
+                {fulfillmentType === "doorstep" && (
+                  <p className="muted" style={{ fontSize: "0.82rem", margin: "4px 0 0" }}>
+                    * Delivery charges will be confirmed with Annu Book Center based on your location.
+                  </p>
+                )}
               </div>
 
               <div className="panel stack">
@@ -349,11 +356,11 @@ export default function CartPage() {
                         onChange={() => setFulfillmentType("doorstep")}
                       />
                       <label htmlFor="fulfill-doorstep" style={{ fontWeight: 700, cursor: "pointer", margin: 0 }}>
-                        🚚 Doorstep Delivery
+                        🏠 Home Delivery
                       </label>
                     </div>
                     <p className="muted" style={{ fontSize: "0.82rem", margin: "6px 0 0 24px" }}>
-                      Delivered to your door via Cash on Delivery (+₹100 fee).
+                      Delivery to your address. Delivery fee is <strong>To be confirmed</strong> based on location.
                     </p>
                   </div>
 
@@ -377,18 +384,24 @@ export default function CartPage() {
                         onChange={() => setFulfillmentType("store_visit")}
                       />
                       <label htmlFor="fulfill-store" style={{ fontWeight: 700, cursor: "pointer", margin: 0 }}>
-                        🏬 Visit & Buy at Store
+                        🏬 Store Pickup
                       </label>
                     </div>
                     <p className="muted" style={{ fontSize: "0.82rem", margin: "6px 0 0 24px" }}>
-                      Reserve books & buy directly in store (<strong>FREE / ₹0 delivery fee</strong>).
+                      Reserve books & pickup directly at store (<strong>FREE / ₹0 delivery fee</strong>).
                     </p>
                   </div>
                 </div>
 
                 {fulfillmentType === "doorstep" ? (
                   <div className="stack" style={{ marginTop: "12px" }}>
-                    <label>Select Delivery Address</label>
+                    <div className="panel stack" style={{ background: "rgba(59, 130, 246, 0.06)", border: "1px solid rgba(59, 130, 246, 0.2)", padding: "12px" }}>
+                      <p style={{ margin: 0, fontSize: "0.88rem", fontWeight: 600, color: "var(--primary)" }}>
+                        ℹ️ Home Delivery Notice: Delivery charges depend on your delivery location. Please contact Annu Book Center on WhatsApp/Phone after submitting to confirm your delivery charge.
+                      </p>
+                    </div>
+
+                    <label style={{ marginTop: "6px" }}>Select Delivery Address</label>
                     {addresses.length > 0 ? (
                       <select value={addressId} onChange={(e) => setAddressId(e.target.value)}>
                         {addresses.map((a) => (
@@ -463,9 +476,9 @@ export default function CartPage() {
                     <div className="row" style={{ gap: "8px", alignItems: "center" }}>
                       <span style={{ fontSize: "1.2rem" }}>📍</span>
                       <div>
-                        <strong>Store Location: Annu Book Center</strong>
+                        <strong>Store Location: {STORE_CONFIG.name}</strong>
                         <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-                          Main Market, Dehradun, Uttarakhand &bull; Timings: 10:00 AM - 8:30 PM (Mon-Sat)
+                          {STORE_CONFIG.address} &bull; Timings: {STORE_CONFIG.timings}
                         </p>
                       </div>
                     </div>
@@ -515,10 +528,13 @@ export default function CartPage() {
                   {isSubmitting
                     ? "Processing..."
                     : fulfillmentType === "store_visit"
-                    ? `Reserve & Book Store Visit (${formatINR(activeTotalAmount)})`
-                    : `Place Doorstep Order (${formatINR(activeTotalAmount)})`}
+                    ? `Reserve & Book Store Pickup (${formatINR(activeTotalAmount)})`
+                    : `Request Home Delivery (${formatINR(activeTotalAmount)})`}
                 </button>
               </div>
+
+              {/* Centralized Store Contact Helper Box */}
+              <ContactStore title="Have Questions About Books or Delivery?" subtitle="Contact Annu Book Center directly on WhatsApp or Call" />
             </div>
           </div>
         )}

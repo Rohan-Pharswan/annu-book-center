@@ -139,7 +139,8 @@ export const POST = withErrorHandling(async (request) => {
       updatedProducts.push({ productId: product._id, quantity });
     }
 
-    const deliveryCharge = fulfillmentType === "store_visit" ? 0 : DEFAULT_DELIVERY_CHARGE;
+    const deliveryCharge = 0;
+    const deliveryChargeStatus = fulfillmentType === "store_visit" ? "not_required" : "pending";
     const totalAmount = Number((discountedSubtotal + deliveryCharge).toFixed(2));
 
     const order = await Order.create({
@@ -150,6 +151,7 @@ export const POST = withErrorHandling(async (request) => {
       subtotalAmount: Number(subtotalAmount.toFixed(2)),
       totalSavings: Number(totalSavings.toFixed(2)),
       deliveryCharge,
+      deliveryChargeStatus,
       totalAmount,
       address: address ? address.toObject() : undefined,
       customerEmail: user.email || "",
@@ -162,21 +164,44 @@ export const POST = withErrorHandling(async (request) => {
 
     user.cart = [];
     await user.save({ validateModifiedOnly: true });
-    await Notification.create({
-      type: "order_placed",
-      title: fulfillmentType === "store_visit" ? "Store visit reservation placed" : "New doorstep order placed",
-      message:
-        fulfillmentType === "store_visit"
-          ? `${user.name || "Customer"} reserved books for Store Visit on ${storeVisit.visitDate} (Order #${String(order._id).slice(-6)} - \u20B9${totalAmount.toFixed(2)})`
-          : `${user.name || "Customer"} placed doorstep order #${String(order._id).slice(-6)} for \u20B9${totalAmount.toFixed(2)}`,
-      meta: {
-        orderId: order._id,
-        userId: user._id,
-        fulfillmentType,
-        status: order.status,
-        totalAmount
-      }
-    });
+
+    if (fulfillmentType === "doorstep") {
+      await Notification.create({
+        type: "home_delivery_request",
+        title: "🏠 Home Delivery Request — Action Required",
+        message: `${user.name || "Customer"} (${customerPhone || "No Phone"}) requested Home Delivery for order #${String(order._id).slice(-6)} (Book Subtotal: ₹${discountedSubtotal.toFixed(2)}). Contact customer to confirm delivery charge.`,
+        meta: {
+          orderId: order._id,
+          userId: user._id,
+          customerName: user.name || "Customer",
+          customerPhone: customerPhone || "",
+          customerEmail: user.email || "",
+          fulfillmentType: "doorstep",
+          deliveryChargeStatus: "pending",
+          deliveryAddress: address ? address.toObject() : null,
+          items: items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
+          subtotalAmount: Number(discountedSubtotal.toFixed(2)),
+          totalAmount: Number(totalAmount.toFixed(2))
+        }
+      });
+    } else {
+      await Notification.create({
+        type: "store_visit_reservation",
+        title: "🏬 Store Visit Reservation Placed",
+        message: `${user.name || "Customer"} reserved books for Store Visit on ${storeVisit?.visitDate || "Scheduled Date"} (Order #${String(order._id).slice(-6)} - ₹${totalAmount.toFixed(2)})`,
+        meta: {
+          orderId: order._id,
+          userId: user._id,
+          customerName: user.name || "Customer",
+          customerPhone: customerPhone || "",
+          customerEmail: user.email || "",
+          fulfillmentType: "store_visit",
+          storeVisit,
+          items: items.map((i) => ({ name: i.name, quantity: i.quantity, price: i.price })),
+          totalAmount
+        }
+      });
+    }
 
     return NextResponse.json({ success: true, order }, { status: 201 });
   } finally {

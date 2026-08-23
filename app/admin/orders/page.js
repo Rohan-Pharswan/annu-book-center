@@ -4,23 +4,35 @@ import { useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import { formatINR } from "@/lib/currency";
 import { useToast } from "@/components/ToastProvider";
+import { STORE_CONFIG, getAdminToCustomerWhatsAppUrl, getCustomerMapSearchUrl } from "@/lib/storeConfig";
 
-const statuses = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
-
+const statuses = [
+  "Pending",
+  "Confirmed",
+  "Ready for Pickup",
+  "Picked Up",
+  "Out for Delivery",
+  "Delivered",
+  "Cancelled"
+];
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Newest");
+  const [deliveryFees, setDeliveryFees] = useState({});
+  const [savingFee, setSavingFee] = useState({});
   const toast = useToast();
 
   function getOrderDisplay(order) {
-    const deliveryCharge = Number(order.deliveryCharge ?? 100);
+    const deliveryChargeStatus =
+      order.deliveryChargeStatus || (order.fulfillmentType === "store_visit" ? "not_required" : "confirmed");
+    const deliveryCharge = Number(order.deliveryCharge ?? 0);
     const subtotalAmount = Number(
       order.subtotalAmount ?? Math.max(Number(order.totalAmount || 0) - deliveryCharge, 0)
     );
     const totalSavings = Number(order.totalSavings ?? 0);
-    return { deliveryCharge, subtotalAmount, totalSavings };
+    return { deliveryCharge, deliveryChargeStatus, subtotalAmount, totalSavings };
   }
 
   async function load() {
@@ -29,7 +41,15 @@ export default function AdminOrdersPage() {
       if (statusFilter !== "All") params.set("status", statusFilter);
       const res = await fetch(`/api/admin/orders?${params.toString()}`);
       const data = await res.json();
-      setOrders(data.orders || []);
+      const list = data.orders || [];
+      setOrders(list);
+
+      // Initialize delivery fee state
+      const initialFees = {};
+      for (const ord of list) {
+        initialFees[ord._id] = ord.deliveryCharge ?? 0;
+      }
+      setDeliveryFees(initialFees);
     } catch {
       toast.error("Failed to load orders");
     }
@@ -55,6 +75,34 @@ export default function AdminOrdersPage() {
       await load();
     } catch {
       toast.error("Failed to update status");
+    }
+  }
+
+  async function confirmDeliveryCharge(orderId) {
+    const fee = Number(deliveryFees[orderId]);
+    if (!Number.isFinite(fee) || fee < 0) {
+      toast.error("Please enter a valid delivery charge (₹0 or greater)");
+      return;
+    }
+
+    setSavingFee((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/delivery-charge`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryCharge: fee })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update delivery charge");
+        return;
+      }
+      toast.success(`Delivery charge set to ₹${fee} (Total: ₹${data.order?.totalAmount})`);
+      await load();
+    } catch {
+      toast.error("Failed to update delivery charge");
+    } finally {
+      setSavingFee((prev) => ({ ...prev, [orderId]: false }));
     }
   }
 
@@ -98,6 +146,15 @@ export default function AdminOrdersPage() {
     }
   }
 
+  function copyAddress(addr) {
+    if (!addr) {
+      toast.error("No address information available");
+      return;
+    }
+    const full = [addr.line1, addr.city, addr.state, addr.postalCode].filter(Boolean).join(", ");
+    navigator.clipboard.writeText(full);
+    toast.success("Address copied to clipboard!");
+  }
 
   const visibleOrders = useMemo(() => {
     const items = [...orders];
@@ -121,8 +178,8 @@ export default function AdminOrdersPage() {
     <AuthGate role="admin">
       <section>
         <h1>Manage Orders</h1>
-        <div className="panel row">
-          <label htmlFor="status-filter">Filter</label>
+        <div className="panel row" style={{ gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+          <label htmlFor="status-filter">Filter:</label>
           <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="All">All statuses</option>
             {statuses.map((status) => (
@@ -131,7 +188,7 @@ export default function AdminOrdersPage() {
               </option>
             ))}
           </select>
-          <label htmlFor="sort-by">Sort</label>
+          <label htmlFor="sort-by">Sort:</label>
           <select id="sort-by" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="Newest">Newest</option>
             <option value="Oldest">Oldest</option>
@@ -139,55 +196,85 @@ export default function AdminOrdersPage() {
             <option value="Amount Low-High">Amount Low-High</option>
           </select>
         </div>
-        <div className="stack">
+
+        <div className="stack" style={{ gap: "16px", marginTop: "16px" }}>
           {visibleOrders.map((order) => {
-            const { deliveryCharge, subtotalAmount, totalSavings } = getOrderDisplay(order);
+            const { deliveryCharge, deliveryChargeStatus, subtotalAmount, totalSavings } = getOrderDisplay(order);
+            const isHomeDelivery = order.fulfillmentType === "doorstep" || !order.fulfillmentType;
+            const customerPhone = order.customerPhone || order.address?.phone || "";
+            const customerName = order.userId?.name || "Customer";
+            const mapUrl = getCustomerMapSearchUrl(order.address);
+            const waUrl = getAdminToCustomerWhatsAppUrl({
+              customerPhone,
+              customerName,
+              orderId: order._id
+            });
+
             return (
-              <div key={order._id} className="panel">
-                <p>
-                  <strong>{order.userId?.name}</strong> ({order.userId?.email})
-                </p>
-                <div className="row" style={{ gap: "8px", alignItems: "center", margin: "4px 0 8px" }}>
-                  <span className="muted">Fulfillment:</span>
-                  <span className="badge" style={{ fontWeight: 700 }}>
-                    {order.fulfillmentType === "store_visit" ? "🏬 Store Visit & In-Store Purchase" : "🚚 Doorstep Delivery (COD)"}
-                  </span>
+              <div
+                key={order._id}
+                className="panel stack"
+                style={{
+                  borderLeft: isHomeDelivery && deliveryChargeStatus === "pending" ? "5px solid #f59e0b" : "1px solid var(--border)",
+                  padding: "18px",
+                  gap: "10px"
+                }}
+              >
+                {/* Top Row: Customer & Order Meta */}
+                <div className="row between" style={{ alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
+                  <div>
+                    <h3 style={{ margin: "0 0 4px" }}>
+                      Order #{order._id.slice(-6)} &mdash; <strong>{customerName}</strong>
+                    </h3>
+                    <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+                      Placed on {new Date(order.createdAt).toLocaleDateString()} at{" "}
+                      {new Date(order.createdAt).toLocaleTimeString()} &bull; Phone: <strong>{customerPhone || "N/A"}</strong>
+                    </p>
+                  </div>
+                  <div className="row" style={{ gap: "8px", alignItems: "center" }}>
+                    <span className="badge" style={{ fontWeight: 700 }}>
+                      {order.fulfillmentType === "store_visit" ? "🏬 Store Pickup" : "🏠 Home Delivery"}
+                    </span>
+                    <span className={`status status-${(order.status || "").toLowerCase().replace(/\s+/g, "-")}`}>
+                      {order.status}
+                    </span>
+                  </div>
                 </div>
-                <p>Date: {new Date(order.createdAt).toLocaleDateString()}</p>
-                <p>Time: {new Date(order.createdAt).toLocaleTimeString()}</p>
-                <p>Phone: {order.customerPhone || order.address?.phone || "N/A"}</p>
-                <p>Email: {order.customerEmail || order.userId?.email || "N/A"}</p>
-                <p>
-                  Email Verified: {order.emailVerifiedByAdmin ? "Yes" : "No"} | Phone Verified:{" "}
-                  {order.phoneVerifiedByAdmin ? "Yes" : "No"}
-                </p>
+
+                {/* Home Delivery Location & Store Visit Details */}
                 {order.fulfillmentType === "store_visit" ? (
-                  <div className="panel stack" style={{ background: "var(--surface-muted, rgba(0,0,0,0.02))", padding: "8px 12px", margin: "6px 0" }}>
+                  <div className="panel stack" style={{ background: "var(--surface-muted, rgba(0,0,0,0.02))", padding: "10px", margin: "4px 0" }}>
                     <p style={{ margin: 0 }}>
                       <strong>🏬 Store Visit Planned:</strong> {order.storeVisit?.visitDate || "Scheduled"} ({order.storeVisit?.visitTime || "Store Hours"})
                     </p>
                     <p className="muted" style={{ margin: 0, fontSize: "0.82rem" }}>
-                      Location: {order.storeVisit?.storeLocation || "Annu Book Center, Dehradun"}
+                      Location: {STORE_CONFIG.name} &bull; {STORE_CONFIG.address}
                     </p>
                   </div>
                 ) : order.address ? (
-                  <p>
-                    <strong>Delivery Address:</strong> {order.address.label} &mdash; {order.address.line1}, {order.address.city}, {order.address.state} - {order.address.postalCode}
-                  </p>
+                  <div className="panel row between" style={{ background: "var(--surface-muted, #f8fafc)", padding: "10px 14px", borderRadius: "6px", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.85rem", color: "var(--muted)" }}>📍 DELIVERY ADDRESS:</strong>
+                      <p style={{ margin: "2px 0 0", fontSize: "0.92rem" }}>
+                        {order.address.label} &mdash; {order.address.line1}, {order.address.city}, {order.address.state} &mdash; <strong>{order.address.postalCode}</strong>
+                      </p>
+                    </div>
+                    <div className="row" style={{ gap: "8px" }}>
+                      <button type="button" className="ghost-btn" style={{ fontSize: "0.82rem" }} onClick={() => copyAddress(order.address)}>
+                        📋 Copy Address
+                      </button>
+                      {mapUrl && (
+                        <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="ghost-btn" style={{ fontSize: "0.82rem", textDecoration: "none" }}>
+                          📍 Open in Maps
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 ) : null}
-                <p>Subtotal: {formatINR(subtotalAmount)}</p>
-                <p>You Saved: {formatINR(totalSavings)}</p>
-                <p>
-                  Delivery Charge:{" "}
-                  {order.fulfillmentType === "store_visit" || deliveryCharge === 0 ? "₹0 (Store Visit)" : formatINR(deliveryCharge)}
-                </p>
-                <p><strong>Total: {formatINR(order.totalAmount)}</strong></p>
-                <p>Payment Method: {order.paymentMethod || (order.fulfillmentType === "store_visit" ? "Pay at Store" : "Cash on Delivery")}</p>
-                <p>Status: <span className="status">{order.status}</span></p>
 
                 {/* Ordered Items Breakdown */}
                 {Array.isArray(order.items) && order.items.length > 0 && (
-                  <div className="order-items-list">
+                  <div className="order-items-list" style={{ margin: "4px 0" }}>
                     {order.items.map((item, idx) => (
                       <div key={`${item.productId || idx}-${idx}`} className="order-item-row">
                         {item.image ? (
@@ -212,29 +299,130 @@ export default function AdminOrdersPage() {
                   </div>
                 )}
 
-                <div className="row">
-                  <select value={order.status} onChange={(e) => updateStatus(order._id, e.target.value)}>
-                    {statuses.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    className="ghost-btn"
-                    onClick={() => setVerification(order._id, { emailVerifiedByAdmin: !order.emailVerifiedByAdmin })}
-                  >
-                    {order.emailVerifiedByAdmin ? "Unverify Email" : "Verify Email"}
-                  </button>
-                  <button
-                    className="ghost-btn"
-                    onClick={() => setVerification(order._id, { phoneVerifiedByAdmin: !order.phoneVerifiedByAdmin })}
-                  >
-                    {order.phoneVerifiedByAdmin ? "Unverify Phone" : "Verify Phone"}
-                  </button>
-                  <button className="ghost-btn" onClick={() => deleteOrder(order._id)}>
-                    Delete
-                  </button>
+                {/* Financial Summary & Delivery Charge Control */}
+                <div className="row between" style={{ background: "var(--surface-muted, #f8fafc)", padding: "12px", borderRadius: "6px", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <div style={{ fontSize: "0.9rem" }}>
+                      Books Subtotal: <strong>{formatINR(subtotalAmount)}</strong>
+                      {totalSavings > 0 && <span style={{ color: "var(--success)", marginLeft: "8px" }}>(Saved {formatINR(totalSavings)})</span>}
+                    </div>
+                    <div style={{ fontSize: "0.9rem", marginTop: "2px" }}>
+                      Delivery Fee:{" "}
+                      {order.fulfillmentType === "store_visit" ? (
+                        <span style={{ color: "var(--success)", fontWeight: 600 }}>₹0 (Store Pickup)</span>
+                      ) : deliveryChargeStatus === "pending" ? (
+                        <span style={{ color: "#d97706", fontWeight: 700 }}>To Be Confirmed</span>
+                      ) : (
+                        <span style={{ color: "var(--success)", fontWeight: 700 }}>{formatINR(deliveryCharge)} (Confirmed)</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "1.05rem", fontWeight: 800, marginTop: "4px" }}>
+                      Total Amount: {formatINR(order.totalAmount)}
+                    </div>
+                  </div>
+
+                  {/* Delivery Charge Input for Home Delivery */}
+                  {isHomeDelivery && (
+                    <div className="row" style={{ gap: "8px", alignItems: "center" }}>
+                      <label htmlFor={`delivery-fee-${order._id}`} style={{ fontSize: "0.85rem", fontWeight: 600, margin: 0 }}>
+                        Set Delivery Fee: ₹
+                      </label>
+                      <input
+                        id={`delivery-fee-${order._id}`}
+                        type="number"
+                        min="0"
+                        step="10"
+                        style={{ width: "90px", padding: "6px 8px" }}
+                        value={deliveryFees[order._id] ?? 0}
+                        onChange={(e) =>
+                          setDeliveryFees((prev) => ({ ...prev, [order._id]: e.target.value }))
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ fontSize: "0.85rem", padding: "6px 12px" }}
+                        disabled={savingFee[order._id]}
+                        onClick={() => confirmDeliveryCharge(order._id)}
+                      >
+                        {savingFee[order._id] ? "Saving..." : "Confirm Delivery Charge"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions Row: WhatsApp, Call, Status, Verification, Delete */}
+                <div className="row between" style={{ marginTop: "4px", paddingTop: "8px", borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: "10px" }}>
+                  <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
+                    {waUrl && (
+                      <a
+                        href={waUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn"
+                        style={{
+                          background: "#25D366",
+                          color: "#fff",
+                          textDecoration: "none",
+                          fontSize: "0.85rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "6px 12px"
+                        }}
+                      >
+                        <span>💬</span> WhatsApp
+                      </a>
+                    )}
+                    {customerPhone && (
+                      <a
+                        href={`tel:${customerPhone.replace(/\D/g, "")}`}
+                        className="btn-secondary"
+                        style={{
+                          textDecoration: "none",
+                          fontSize: "0.85rem",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          padding: "6px 12px"
+                        }}
+                      >
+                        <span>📞</span> Call
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="row" style={{ gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                    <label htmlFor={`status-select-${order._id}`} style={{ fontSize: "0.85rem", margin: 0 }}>
+                      Status:
+                    </label>
+                    <select
+                      id={`status-select-${order._id}`}
+                      value={order.status}
+                      onChange={(e) => updateStatus(order._id, e.target.value)}
+                      style={{ padding: "4px 8px", fontSize: "0.85rem" }}
+                    >
+                      {statuses.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="ghost-btn"
+                      style={{ fontSize: "0.82rem", padding: "4px 8px" }}
+                      onClick={() => setVerification(order._id, { phoneVerifiedByAdmin: !order.phoneVerifiedByAdmin })}
+                    >
+                      {order.phoneVerifiedByAdmin ? "Phone ✓" : "Verify Phone"}
+                    </button>
+                    <button
+                      className="ghost-btn"
+                      style={{ fontSize: "0.82rem", padding: "4px 8px", color: "var(--danger)" }}
+                      onClick={() => deleteOrder(order._id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             );

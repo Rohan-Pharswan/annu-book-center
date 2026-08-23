@@ -46,7 +46,12 @@ const OrderSchema = new Schema(
     storeVisit: { type: StoreVisitSchema, default: null },
     subtotalAmount: { type: Number, required: true, min: 0, default: 0 },
     totalSavings: { type: Number, required: true, min: 0, default: 0 },
-    deliveryCharge: { type: Number, required: true, min: 0, default: 100 },
+    deliveryCharge: { type: Number, required: true, min: 0, default: 0 },
+    deliveryChargeStatus: {
+      type: String,
+      enum: ["not_required", "pending", "confirmed"],
+      default: "not_required"
+    },
     totalAmount: { type: Number, required: true, min: 0 },
     address: { type: AddressSnapshotSchema, required: false },
     customerEmail: { type: String, default: "" },
@@ -55,7 +60,15 @@ const OrderSchema = new Schema(
     phoneVerifiedByAdmin: { type: Boolean, default: false },
     status: {
       type: String,
-      enum: ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"],
+      enum: [
+        "Pending",
+        "Confirmed",
+        "Ready for Pickup",
+        "Picked Up",
+        "Out for Delivery",
+        "Delivered",
+        "Cancelled"
+      ],
       default: "Pending"
     },
     paymentMethod: { type: String, default: "Cash on Delivery" }
