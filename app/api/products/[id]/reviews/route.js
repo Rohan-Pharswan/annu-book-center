@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { reviewSchema, validate } from "@/lib/validators";
+import { checkRateLimit } from "@/lib/rateLimit";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Review from "@/models/Review";
 import Product from "@/models/Product";
@@ -11,6 +12,16 @@ import { refreshProductRating } from "@/lib/reviews";
 export const POST = withErrorHandling(async (request, { params }) => {
   const auth = await requireAuth(request);
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
+
+  // Rate limit: max 5 review submissions per user per 5 minutes
+  const userId = String(auth.user._id);
+  const rate = checkRateLimit(`review:${userId}`, 5, 5 * 60_000);
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: "Too many review submissions. Please wait a few minutes." },
+      { status: 429 }
+    );
+  }
 
   const { id } = await params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
