@@ -54,6 +54,7 @@ const OrderSchema = new Schema(
     },
     totalAmount: { type: Number, required: true, min: 0 },
     address: { type: AddressSnapshotSchema, required: false },
+    customerName: { type: String, default: "" },
     customerEmail: { type: String, default: "" },
     customerPhone: { type: String, default: "" },
     emailVerifiedByAdmin: { type: Boolean, default: false },

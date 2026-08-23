@@ -156,6 +156,7 @@ export const POST = withErrorHandling(async (request) => {
       deliveryChargeStatus,
       totalAmount,
       address: address ? address.toObject() : undefined,
+      customerName: user.name || auth.user.name || "Customer",
       customerEmail: user.email || "",
       customerPhone: customerPhone || "",
       emailVerifiedByAdmin: false,
