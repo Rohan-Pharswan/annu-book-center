@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import { formatINR } from "@/lib/currency";
 import { STORE_CONFIG, getCustomerToStoreWhatsAppUrl } from "@/lib/storeConfig";
-import ContactStore from "@/components/ContactStore";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);

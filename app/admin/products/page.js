@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -190,8 +191,8 @@ export default function AdminProductsPage() {
     const normalizedImage = normalizeImageInput(imageData);
     const normalizedImages = Array.isArray(form.images)
       ? form.images
-          .map((img) => normalizeImageInput(img))
-          .filter((img) => typeof img === "string" && img.trim().length > 0)
+        .map((img) => normalizeImageInput(img))
+        .filter((img) => typeof img === "string" && img.trim().length > 0)
       : [];
 
     const payload = {
