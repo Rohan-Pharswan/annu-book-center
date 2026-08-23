@@ -4,6 +4,7 @@ import { connectDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { withErrorHandling } from "@/lib/apiHandler";
 import Order from "@/models/Order";
+import Notification from "@/models/Notification";
 
 export const PATCH = withErrorHandling(async (request, { params }) => {
   const admin = await requireAdmin(request);
@@ -24,15 +25,29 @@ export const PATCH = withErrorHandling(async (request, { params }) => {
   const order = await Order.findById(id).populate("userId", "name email");
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
+  const formattedFee = Number(deliveryCharge.toFixed(2));
+  const targetStatus = body.status && ["Pending", "Confirmed", "Ready for Pickup", "Picked Up", "Out for Delivery", "Delivered", "Cancelled"].includes(body.status)
+    ? body.status
+    : order.status;
+
+  // Idempotent check: if already confirmed with exact same charge and status, return immediately without duplicate writes
+  if (
+    order.deliveryChargeStatus === "confirmed" &&
+    Number(order.deliveryCharge ?? 0) === formattedFee &&
+    order.status === targetStatus
+  ) {
+    return NextResponse.json({ success: true, order, alreadyConfirmed: true });
+  }
+
   // Calculate discounted items payable subtotal from order.items to guarantee 100% discount precision
   const discountedSubtotal = order.items.reduce(
     (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 1),
     0
   );
 
-  const updatedTotal = Number((discountedSubtotal + deliveryCharge).toFixed(2));
+  const updatedTotal = Number((discountedSubtotal + formattedFee).toFixed(2));
 
-  order.deliveryCharge = Number(deliveryCharge.toFixed(2));
+  order.deliveryCharge = formattedFee;
   order.deliveryChargeStatus = "confirmed";
   order.totalAmount = updatedTotal;
 
@@ -42,5 +57,18 @@ export const PATCH = withErrorHandling(async (request, { params }) => {
 
   await order.save();
 
-  return NextResponse.json({ success: true, order });
+  // Sync notification meta in background
+  await Notification.updateMany(
+    { "meta.orderId": order._id },
+    {
+      $set: {
+        "meta.deliveryCharge": order.deliveryCharge,
+        "meta.deliveryChargeStatus": "confirmed",
+        "meta.totalAmount": order.totalAmount,
+        "meta.orderStatus": order.status
+      }
+    }
+  );
+
+  return NextResponse.json({ success: true, order, alreadyConfirmed: false });
 });
