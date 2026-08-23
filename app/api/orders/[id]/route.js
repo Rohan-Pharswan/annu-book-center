@@ -16,7 +16,7 @@ export const GET = withErrorHandling(async (request, { params }) => {
 
   await connectDB();
   const query = auth.user.role === "admin" ? { _id: id } : { _id: id, userId: auth.user._id };
-  const order = await Order.findOne(query);
+  const order = await Order.findOne(query).populate("userId", "name email phone");
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   return NextResponse.json({ order });
 });

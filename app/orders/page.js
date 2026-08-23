@@ -8,6 +8,7 @@ import ContactStore from "@/components/ContactStore";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   function getOrderDisplay(order) {
@@ -23,9 +24,14 @@ export default function OrdersPage() {
 
   async function loadOrders() {
     try {
-      const res = await fetch("/api/orders");
-      const data = await res.json();
-      setOrders(data.orders || []);
+      const [ordersRes, meRes] = await Promise.all([
+        fetch("/api/orders"),
+        fetch("/api/auth/me")
+      ]);
+      const ordersData = await ordersRes.json();
+      const meData = await meRes.json();
+      setOrders(ordersData.orders || []);
+      if (meData?.user) setCurrentUser(meData.user);
     } finally {
       setLoading(false);
     }
@@ -99,7 +105,7 @@ export default function OrdersPage() {
 
                       <div className="row" style={{ gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
                         <a
-                          href={getCustomerToStoreWhatsAppUrl(order)}
+                          href={getCustomerToStoreWhatsAppUrl(order, currentUser)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn"
@@ -251,6 +257,28 @@ export default function OrdersPage() {
                     ) : null}
 
                     <p className="muted" style={{ margin: "2px 0 0" }}>Payment Method: {order.paymentMethod || (order.fulfillmentType === "store_visit" ? "Pay at Store" : "Cash on Delivery")}</p>
+
+                    {isHomeDelivery && !isPendingDeliveryFee && (
+                      <div style={{ marginTop: "8px" }}>
+                        <a
+                          href={getCustomerToStoreWhatsAppUrl(order, currentUser)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ghost-btn"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            textDecoration: "none",
+                            fontSize: "0.85rem",
+                            color: "#166534",
+                            fontWeight: 600
+                          }}
+                        >
+                          <span>💬</span> Send Order Details to WhatsApp
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

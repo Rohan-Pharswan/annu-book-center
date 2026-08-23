@@ -20,7 +20,9 @@ export const GET = withErrorHandling(async (request) => {
   if (!auth.ok) return NextResponse.json({ error: auth.message }, { status: auth.status });
 
   await connectDB();
-  const orders = await Order.find({ userId: auth.user._id }).sort({ createdAt: -1 });
+  const orders = await Order.find({ userId: auth.user._id })
+    .populate("userId", "name email phone")
+    .sort({ createdAt: -1 });
   return NextResponse.json({ orders });
 });
 
