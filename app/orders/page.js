@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import { formatINR } from "@/lib/currency";
 import { STORE_CONFIG, getCustomerToStoreWhatsAppUrl } from "@/lib/storeConfig";
+import ContactStore from "@/components/ContactStore";
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -62,7 +63,8 @@ export default function OrdersPage() {
             {orders.map((order) => {
               const { deliveryCharge, deliveryChargeStatus, subtotalAmount, totalSavings } = getOrderDisplay(order);
               const statusClass = `status status-${(order.status || "").toLowerCase().replace(/\s+/g, "-")}`;
-              const isHomeDelivery = order.fulfillmentType === "doorstep" || !order.fulfillmentType;
+              const isStoreVisit = order.fulfillmentType === "store_visit";
+              const isHomeDelivery = !isStoreVisit;
               const isPendingDeliveryFee = isHomeDelivery && deliveryChargeStatus === "pending";
 
               return (
@@ -78,8 +80,8 @@ export default function OrdersPage() {
                     {new Date(order.createdAt).toLocaleTimeString()}
                   </p>
 
-                  {/* Home Delivery Pending Notice & Direct WhatsApp Action */}
-                  {isPendingDeliveryFee && (
+                  {/* Home Delivery Direct WhatsApp Action Banner */}
+                  {isHomeDelivery && (
                     <div
                       className="panel stack"
                       style={{
@@ -94,10 +96,12 @@ export default function OrdersPage() {
                         <span style={{ fontSize: "1.4rem" }}>🏠</span>
                         <div>
                           <strong style={{ fontSize: "1.05rem", color: "#166534" }}>
-                            Home Delivery Requested &mdash; Please Contact Store on WhatsApp
+                            Home Delivery &mdash; Contact Store on WhatsApp
                           </strong>
                           <p style={{ margin: "2px 0 0", fontSize: "0.88rem", color: "#15803d" }}>
-                            Delivery charges depend on your location. Please tap below to send your order details to Annu Book Center on WhatsApp to confirm delivery charges.
+                            {deliveryChargeStatus === "pending"
+                              ? "Delivery charges depend on your location. Please tap below to send your order details to Annu Book Center on WhatsApp to confirm delivery charges."
+                              : "Tap below to contact Annu Book Center on WhatsApp with your order details."}
                           </p>
                         </div>
                       </div>
@@ -136,7 +140,7 @@ export default function OrdersPage() {
                             fontWeight: 600
                           }}
                         >
-                          <span>📞</span> Call 8077308953
+                          <span>📞</span> Call {STORE_CONFIG.primaryPhoneRaw}
                         </a>
 
                         <a
@@ -151,7 +155,7 @@ export default function OrdersPage() {
                             fontWeight: 600
                           }}
                         >
-                          <span>☎️</span> Call 9411395022
+                          <span>☎️</span> Call {STORE_CONFIG.altPhoneRaw}
                         </a>
                       </div>
                     </div>
@@ -195,7 +199,7 @@ export default function OrdersPage() {
                     <div className="row" style={{ gap: "8px", alignItems: "center" }}>
                       <span className="muted">Fulfillment:</span>
                       <span className="badge" style={{ fontSize: "0.82rem", fontWeight: 700 }}>
-                        {order.fulfillmentType === "store_visit" ? "🏬 Store Pickup & In-Store Purchase" : "🏠 Home Delivery"}
+                        {isStoreVisit ? "🏬 Store Pickup & In-Store Purchase" : "🏠 Home Delivery"}
                       </span>
                     </div>
 
@@ -211,10 +215,10 @@ export default function OrdersPage() {
                     )}
                     <div className="row between">
                       <span className="muted">
-                        {order.fulfillmentType === "store_visit" ? "Delivery Fee (Store Pickup):" : "Delivery Charge (Home Delivery):"}
+                        {isStoreVisit ? "Delivery Fee (Store Pickup):" : "Delivery Charge (Home Delivery):"}
                       </span>
                       <span>
-                        {order.fulfillmentType === "store_visit" ? (
+                        {isStoreVisit ? (
                           <span style={{ color: "var(--success)", fontWeight: 600 }}>FREE (₹0)</span>
                         ) : isPendingDeliveryFee ? (
                           <span style={{ color: "var(--primary)", fontWeight: 700 }}>To be confirmed</span>
@@ -228,7 +232,7 @@ export default function OrdersPage() {
                       <span>{formatINR(order.totalAmount)}</span>
                     </div>
 
-                    {order.fulfillmentType === "store_visit" ? (
+                    {isStoreVisit ? (
                       <div className="panel stack" style={{ marginTop: "6px", background: "var(--surface-muted, rgba(0,0,0,0.02))", padding: "10px" }}>
                         <p style={{ margin: 0 }}>
                           <strong>🏬 Store Visit Planned:</strong> {order.storeVisit?.visitDate || "Scheduled"} &bull; Slot: {order.storeVisit?.visitTime || "Store Hours"}
@@ -255,35 +259,21 @@ export default function OrdersPage() {
                       </p>
                     ) : null}
 
-                    <p className="muted" style={{ margin: "2px 0 0" }}>Payment Method: {order.paymentMethod || (order.fulfillmentType === "store_visit" ? "Pay at Store" : "Cash on Delivery")}</p>
-
-                    {isHomeDelivery && !isPendingDeliveryFee && (
-                      <div style={{ marginTop: "8px" }}>
-                        <a
-                          href={getCustomerToStoreWhatsAppUrl(order, currentUser)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ghost-btn"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            textDecoration: "none",
-                            fontSize: "0.85rem",
-                            color: "#166534",
-                            fontWeight: 600
-                          }}
-                        >
-                          <span>💬</span> Send Order Details to WhatsApp
-                        </a>
-                      </div>
-                    )}
+                    <p className="muted" style={{ margin: "2px 0 0" }}>Payment Method: {order.paymentMethod || (isStoreVisit ? "Pay at Store" : "Cash on Delivery")}</p>
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+
+        {/* Centralized Store Contact Helper Box for general inquiries */}
+        <div style={{ marginTop: "24px" }}>
+          <ContactStore
+            title="Need Help with Your Orders or Store Inquiries?"
+            subtitle="Contact Annu Book Center directly on WhatsApp or Call"
+          />
+        </div>
       </section>
     </AuthGate>
   );
