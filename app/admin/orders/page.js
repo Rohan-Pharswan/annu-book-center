@@ -18,6 +18,7 @@ const statuses = [
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Newest");
   const [deliveryFees, setDeliveryFees] = useState({});
@@ -114,7 +115,11 @@ export default function AdminOrdersPage() {
         toast.error(data.error || "Failed to update delivery charge");
         return;
       }
-      toast.success(`Delivery charge set to ₹${fee} (Total: ₹${data.order?.totalAmount})`);
+      if (data.alreadyConfirmed) {
+        toast.success(`Delivery charge is already confirmed at ₹${fee}`);
+      } else {
+        toast.success(`Delivery charge set to ₹${fee} (Total: ₹${data.order?.totalAmount})`);
+      }
       await load();
     } catch {
       toast.error("Failed to update delivery charge");
@@ -174,7 +179,31 @@ export default function AdminOrdersPage() {
   }
 
   const visibleOrders = useMemo(() => {
-    const items = [...orders];
+    let items = [...orders];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const qClean = q.replace(/[^a-z0-9]/g, "");
+      const qNoHash = q.replace(/^#/, "");
+
+      items = items.filter((order) => {
+        const id = String(order._id || "").toLowerCase();
+        const shortId = id.slice(-6);
+        const name = (order.customerName || order.userId?.name || "").toLowerCase();
+        const phone = (order.customerPhone || order.address?.phone || order.userId?.phone || "").toLowerCase();
+        const cleanPhone = phone.replace(/\D/g, "");
+
+        return (
+          id.includes(q) ||
+          (qNoHash && id.includes(qNoHash)) ||
+          shortId.includes(qNoHash) ||
+          name.includes(q) ||
+          phone.includes(q) ||
+          (qClean && cleanPhone.includes(qClean))
+        );
+      });
+    }
+
     if (sortBy === "Oldest") {
       items.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       return items;
@@ -189,29 +218,94 @@ export default function AdminOrdersPage() {
     }
     items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     return items;
-  }, [orders, sortBy]);
+  }, [orders, searchQuery, sortBy]);
 
   return (
     <AuthGate role="admin">
       <section>
-        <h1>Manage Orders</h1>
-        <div className="panel row" style={{ gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-          <label htmlFor="status-filter">Filter:</label>
-          <select id="status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="All">All statuses</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="sort-by">Sort:</label>
-          <select id="sort-by" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="Newest">Newest</option>
-            <option value="Oldest">Oldest</option>
-            <option value="Amount High-Low">Amount High-Low</option>
-            <option value="Amount Low-High">Amount Low-High</option>
-          </select>
+        <div className="row between" style={{ alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <div>
+            <h1 style={{ margin: 0 }}>Manage Orders</h1>
+            <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>
+              Total loaded orders: <strong>{orders.length}</strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Search & Filter Toolbar */}
+        <div className="panel stack" style={{ gap: "12px", background: "var(--surface)", padding: "16px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+          {/* Prominent Search Input */}
+          <div className="row" style={{ gap: "8px", alignItems: "center", width: "100%" }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <input
+                id="search-orders-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="🔍 Search orders by #ID, customer name, or phone number..."
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  fontSize: "0.95rem",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)"
+                }}
+              />
+            </div>
+            {searchQuery && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setSearchQuery("")}
+                style={{ padding: "10px 14px", fontSize: "0.9rem", whiteSpace: "nowrap" }}
+              >
+                ✕ Clear Search
+              </button>
+            )}
+          </div>
+
+          {/* Filter & Sort Row */}
+          <div className="row between" style={{ gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="row" style={{ gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+              <label htmlFor="status-filter" style={{ fontSize: "0.88rem", fontWeight: 600, margin: 0 }}>
+                Status:
+              </label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ padding: "6px 10px", fontSize: "0.88rem" }}
+              >
+                <option value="All">All statuses</option>
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="sort-by" style={{ fontSize: "0.88rem", fontWeight: 600, margin: 0 }}>
+                Sort:
+              </label>
+              <select
+                id="sort-by"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ padding: "6px 10px", fontSize: "0.88rem" }}
+              >
+                <option value="Newest">Newest</option>
+                <option value="Oldest">Oldest</option>
+                <option value="Amount High-Low">Amount High-Low</option>
+                <option value="Amount Low-High">Amount Low-High</option>
+              </select>
+            </div>
+
+            {searchQuery && (
+              <div style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                Showing <strong>{visibleOrders.length}</strong> matching order{visibleOrders.length === 1 ? "" : "s"}
+              </div>
+            )}
+          </div>
         </div>
 
         {focusedOrderId && (
@@ -476,7 +570,36 @@ export default function AdminOrdersPage() {
             );
           })}
 
-          {!visibleOrders.length && <p className="muted">No orders found for the selected filter.</p>}
+          {!visibleOrders.length && (
+            <div className="panel stack" style={{ textAlign: "center", padding: "36px 20px", borderRadius: "8px" }}>
+              {searchQuery ? (
+                <>
+                  <h3 style={{ margin: 0 }}>No orders found</h3>
+                  <p className="muted" style={{ margin: "4px 0 12px", fontSize: "0.92rem" }}>
+                    No orders match your search <strong>"{searchQuery}"</strong>
+                    {statusFilter !== "All" ? ` in status "${statusFilter}"` : ""}.
+                  </p>
+                  <div>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setSearchQuery("")}
+                      style={{ fontSize: "0.88rem" }}
+                    >
+                      ✕ Clear Search
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 style={{ margin: 0 }}>No orders found</h3>
+                  <p className="muted" style={{ margin: "4px 0 0", fontSize: "0.92rem" }}>
+                    No orders found for status filter <strong>"{statusFilter}"</strong>.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </AuthGate>
