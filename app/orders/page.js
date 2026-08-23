@@ -11,9 +11,9 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
 
   function getOrderDisplay(order) {
-    const deliveryChargeStatus =
-      order.deliveryChargeStatus || (order.fulfillmentType === "store_visit" ? "not_required" : "confirmed");
     const deliveryCharge = Number(order.deliveryCharge ?? 0);
+    const deliveryChargeStatus =
+      order.deliveryChargeStatus || (order.fulfillmentType === "store_visit" ? "not_required" : (deliveryCharge > 0 ? "confirmed" : "pending"));
     const subtotalAmount = Number(
       order.subtotalAmount ?? Math.max(Number(order.totalAmount || 0) - deliveryCharge, 0)
     );
