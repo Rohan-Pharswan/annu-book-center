@@ -22,12 +22,13 @@ export default function AdminOrdersPage() {
   const [sortBy, setSortBy] = useState("Newest");
   const [deliveryFees, setDeliveryFees] = useState({});
   const [savingFee, setSavingFee] = useState({});
+  const [focusedOrderId, setFocusedOrderId] = useState("");
   const toast = useToast();
 
   function getOrderDisplay(order) {
-    const deliveryChargeStatus =
-      order.deliveryChargeStatus || (order.fulfillmentType === "store_visit" ? "not_required" : "confirmed");
     const deliveryCharge = Number(order.deliveryCharge ?? 0);
+    const deliveryChargeStatus =
+      order.deliveryChargeStatus || (order.fulfillmentType === "store_visit" ? "not_required" : (deliveryCharge > 0 ? "confirmed" : "pending"));
     const subtotalAmount = Number(
       order.subtotalAmount ?? Math.max(Number(order.totalAmount || 0) - deliveryCharge, 0)
     );
@@ -58,6 +59,22 @@ export default function AdminOrdersPage() {
   useEffect(() => {
     load();
   }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get("orderId");
+      if (targetId) {
+        setFocusedOrderId(targetId);
+        setTimeout(() => {
+          const el = document.getElementById(`order-${targetId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 200);
+      }
+    }
+  }, [orders]);
 
   async function updateStatus(id, status) {
     try {
@@ -197,10 +214,32 @@ export default function AdminOrdersPage() {
           </select>
         </div>
 
+        {focusedOrderId && (
+          <div className="panel row between" style={{ background: "rgba(37, 99, 235, 0.08)", border: "2px solid #2563eb", padding: "12px 16px", alignItems: "center", borderRadius: "8px", marginTop: "12px" }}>
+            <div>
+              <strong style={{ color: "#1e40af" }}>🎯 Focused Order: #{focusedOrderId.slice(-6)}</strong>
+              <p style={{ margin: "2px 0 0", fontSize: "0.85rem", color: "#1e3a8a" }}>
+                Viewing order opened directly from admin alerts.
+              </p>
+            </div>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: "0.85rem", padding: "6px 12px" }}
+              onClick={() => {
+                setFocusedOrderId("");
+                window.history.replaceState({}, "", "/admin/orders");
+              }}
+            >
+              Clear Focus ✕
+            </button>
+          </div>
+        )}
+
         <div className="stack" style={{ gap: "16px", marginTop: "16px" }}>
           {visibleOrders.map((order) => {
             const { deliveryCharge, deliveryChargeStatus, subtotalAmount, totalSavings } = getOrderDisplay(order);
             const isHomeDelivery = order.fulfillmentType === "doorstep" || !order.fulfillmentType;
+            const isFocused = focusedOrderId === String(order._id);
             const customerPhone = order.customerPhone || order.address?.phone || "";
             const customerName = order.userId?.name || "Customer";
             const mapUrl = getCustomerMapSearchUrl(order.address);
@@ -213,11 +252,20 @@ export default function AdminOrdersPage() {
             return (
               <div
                 key={order._id}
+                id={`order-${order._id}`}
                 className="panel stack"
                 style={{
-                  borderLeft: isHomeDelivery && deliveryChargeStatus === "pending" ? "5px solid #f59e0b" : "1px solid var(--border)",
+                  borderLeft: isFocused
+                    ? "6px solid #2563eb"
+                    : isHomeDelivery && deliveryChargeStatus === "pending"
+                    ? "5px solid #f59e0b"
+                    : "1px solid var(--border)",
+                  boxShadow: isFocused ? "0 0 0 3px rgba(37, 99, 235, 0.3)" : undefined,
+                  background: isFocused ? "rgba(37, 99, 235, 0.02)" : undefined,
                   padding: "18px",
-                  gap: "10px"
+                  gap: "10px",
+                  borderRadius: "8px",
+                  transition: "all 0.3s ease"
                 }}
               >
                 {/* Top Row: Customer & Order Meta */}

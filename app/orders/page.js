@@ -39,6 +39,27 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
+
+    function onFocus() {
+      if (typeof document !== "undefined" && !document.hidden) {
+        loadOrders();
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onFocus);
+      document.addEventListener("visibilitychange", onFocus);
+    }
+
+    const interval = setInterval(loadOrders, 20000);
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", onFocus);
+        document.removeEventListener("visibilitychange", onFocus);
+      }
+      clearInterval(interval);
+    };
   }, []);
 
   return (

@@ -9,7 +9,15 @@ import User from "@/models/User";
 import Notification from "@/models/Notification";
 
 
-const ALLOWED = ["Pending", "Confirmed", "Shipped", "Delivered", "Cancelled"];
+const ALLOWED = [
+  "Pending",
+  "Confirmed",
+  "Ready for Pickup",
+  "Picked Up",
+  "Out for Delivery",
+  "Delivered",
+  "Cancelled"
+];
 
 export const PATCH = withErrorHandling(async (request, { params }) => {
   const admin = await requireAdmin(request);

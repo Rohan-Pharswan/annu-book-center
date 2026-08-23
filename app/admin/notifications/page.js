@@ -11,6 +11,8 @@ export default function AdminNotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [deliveryFees, setDeliveryFees] = useState({});
+  const [savingFee, setSavingFee] = useState({});
   const toast = useToast();
 
   async function load() {
@@ -55,6 +57,34 @@ export default function AdminNotificationsPage() {
       window.dispatchEvent(new CustomEvent("cart-updated"));
     } catch {
       toast.error("Failed to update notifications");
+    }
+  }
+
+  async function confirmDeliveryFeeDirectly(orderId, notifId) {
+    const fee = Number(deliveryFees[notifId]);
+    if (!Number.isFinite(fee) || fee < 0) {
+      toast.error("Please enter a valid delivery charge (₹0 or greater)");
+      return;
+    }
+
+    setSavingFee((prev) => ({ ...prev, [notifId]: true }));
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/delivery-charge`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryCharge: fee })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update delivery charge");
+        return;
+      }
+      toast.success(`Delivery charge set to ₹${fee} (Total: ₹${data.order?.totalAmount})`);
+      await load();
+    } catch {
+      toast.error("Failed to update delivery charge");
+    } finally {
+      setSavingFee((prev) => ({ ...prev, [notifId]: false }));
     }
   }
 
@@ -195,6 +225,34 @@ export default function AdminNotificationsPage() {
                       </div>
                     </div>
 
+                    {/* Inline Delivery Fee Control & Action Buttons */}
+                    {meta.orderId && (
+                      <div className="row" style={{ gap: "8px", alignItems: "center", background: "var(--surface)", padding: "10px 12px", borderRadius: "6px", border: "1px solid var(--border)", flexWrap: "wrap" }}>
+                        <label htmlFor={`fee-input-${item._id}`} style={{ fontSize: "0.85rem", fontWeight: 700, margin: 0 }}>
+                          Set Delivery Fee: ₹
+                        </label>
+                        <input
+                          id={`fee-input-${item._id}`}
+                          type="number"
+                          min="0"
+                          step="10"
+                          placeholder="e.g. 50"
+                          style={{ width: "90px", padding: "6px 8px" }}
+                          value={deliveryFees[item._id] ?? ""}
+                          onChange={(e) => setDeliveryFees((prev) => ({ ...prev, [item._id]: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ fontSize: "0.85rem", padding: "6px 12px" }}
+                          disabled={savingFee[item._id]}
+                          onClick={() => confirmDeliveryFeeDirectly(meta.orderId, item._id)}
+                        >
+                          {savingFee[item._id] ? "Saving..." : "Confirm & Update Total"}
+                        </button>
+                      </div>
+                    )}
+
                     {/* Action Buttons */}
                     <div className="row" style={{ gap: "10px", flexWrap: "wrap", marginTop: "4px", paddingTop: "8px", borderTop: "1px solid var(--border)" }}>
                       {waUrl && (
@@ -233,19 +291,35 @@ export default function AdminNotificationsPage() {
                         </a>
                       )}
 
-                      <Link
-                        href="/admin/orders"
-                        className="btn-secondary"
-                        style={{
-                          textDecoration: "none",
-                          fontWeight: 600,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "6px"
-                        }}
-                      >
-                        <span>📋</span> View &amp; Set Delivery Fee
-                      </Link>
+                      {meta.orderId ? (
+                        <Link
+                          href={`/admin/orders?orderId=${meta.orderId}#order-${meta.orderId}`}
+                          className="btn-secondary"
+                          style={{
+                            textDecoration: "none",
+                            fontWeight: 600,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <span>📋</span> View Exact Order
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/admin/orders"
+                          className="btn-secondary"
+                          style={{
+                            textDecoration: "none",
+                            fontWeight: 600,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px"
+                          }}
+                        >
+                          <span>📋</span> View Orders
+                        </Link>
+                      )}
 
                       {address && (
                         <>
