@@ -55,6 +55,7 @@ export default function AdminProductsPage() {
   const [currentProductDiscount, setCurrentProductDiscount] = useState(null);
   const [discountForm, setDiscountForm] = useState(discountInitial);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [finderQuery, setFinderQuery] = useState("");
   const [finderItems, setFinderItems] = useState([]);
   const [finderPagination, setFinderPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -92,30 +93,37 @@ export default function AdminProductsPage() {
     return () => clearTimeout(timer);
   }, [finderQuery, finderPage]);
 
-  async function uploadImage() {
-    const normalizedImage = normalizeImageInput(imageData);
-    if (!normalizedImage) return;
-
-    // A direct HTTP(S) URL is already usable as product image.
-    if (/^https?:\/\//i.test(normalizedImage)) {
-      setForm((prev) => ({ ...prev, images: [normalizedImage] }));
-      setImageData(normalizedImage);
-      return;
-    }
-
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: normalizedImage })
-    });
-    const data = await res.json();
-    if (data.imageUrl) {
-      setForm((prev) => ({ ...prev, images: [data.imageUrl] }));
-      setImageData(data.imageUrl);
-      toast.success("Image uploaded successfully");
-    } else {
-      toast.error(data.error || "Image upload failed");
-    }
+  async function handleFileUpload(file) {
+    if (!file) return;
+    setUploadingImage(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const rawBase64 = String(reader.result || "");
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: rawBase64 })
+        });
+        const data = await res.json();
+        if (res.ok && data.imageUrl) {
+          setForm((prev) => ({ ...prev, images: [data.imageUrl] }));
+          setImageData(data.imageUrl);
+          toast.success("Image uploaded to Cloudinary successfully");
+        } else {
+          toast.error(data.error || "Image upload failed");
+          setImageData("");
+          setForm((prev) => ({ ...prev, images: [] }));
+        }
+      } catch {
+        toast.error("Network error while uploading image");
+        setImageData("");
+        setForm((prev) => ({ ...prev, images: [] }));
+      } finally {
+        setUploadingImage(false);
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   function resetForm() {
@@ -123,6 +131,7 @@ export default function AdminProductsPage() {
     setImageData("");
     setEditingId(null);
     setImageSource("url");
+    setUploadingImage(false);
     setDiscountForm(discountInitial);
     setCurrentProductDiscount(null);
   }
@@ -330,21 +339,21 @@ export default function AdminProductsPage() {
               <input
                 type="file"
                 accept="image/*"
+                disabled={uploadingImage}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const result = String(reader.result || "");
-                    setImageData(result);
-                    setForm((prev) => ({ ...prev, images: [result] }));
-                  };
-                  reader.readAsDataURL(file);
+                  if (file) handleFileUpload(file);
                 }}
               />
-              <p className="muted" style={{ fontSize: "0.82rem", margin: 0 }}>
-                Select an image (PNG, JPG, WEBP) from your computer or device.
-              </p>
+              {uploadingImage ? (
+                <p style={{ fontSize: "0.85rem", color: "var(--primary)", fontWeight: 600, margin: 0 }}>
+                  ⏳ Uploading image to Cloudinary storage, please wait...
+                </p>
+              ) : (
+                <p className="muted" style={{ fontSize: "0.82rem", margin: 0 }}>
+                  Select an image (PNG, JPG, WEBP). It will be optimized and uploaded directly to Cloudinary.
+                </p>
+              )}
             </div>
           )}
 
@@ -359,7 +368,7 @@ export default function AdminProductsPage() {
               <div className="stack" style={{ gap: "4px" }}>
                 <span style={{ fontSize: "0.88rem", fontWeight: 600 }}>Image Ready for Product</span>
                 <span className="muted" style={{ fontSize: "0.78rem" }}>
-                  {imageData.startsWith("data:") ? "Image loaded from your device" : "Direct image URL"}
+                  {imageData.includes("cloudinary.com") ? "Hosted on Cloudinary CDN" : "Direct Image URL"}
                 </span>
                 <button
                   type="button"
@@ -405,8 +414,8 @@ export default function AdminProductsPage() {
             </div>
           </div>
           <div className="row">
-            <button className="btn" disabled={submitting}>
-              {editingId ? "Save Product" : "Add Product"}
+            <button className="btn" disabled={submitting || uploadingImage}>
+              {uploadingImage ? "Uploading Image..." : editingId ? "Save Product" : "Add Product"}
             </button>
             {editingId ? (
               <button type="button" className="ghost-btn" onClick={resetForm}>

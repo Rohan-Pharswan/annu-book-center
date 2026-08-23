@@ -10,6 +10,7 @@ import User from "@/models/User";
 import { calculateDiscountedPrice, getBestDiscountForProduct } from "@/lib/pricing";
 
 import Discount from "@/models/Discount";
+import { uploadImage } from "@/lib/cloudinary";
 
 function normalizeImageUrl(value) {
   if (typeof value !== "string") return "";
@@ -77,7 +78,7 @@ export const PATCH = withErrorHandling(async (request, { params }) => {
 
   const body = await request.json();
   const imageFromBody = normalizeImageUrl(body.image);
-  const normalizedImages = Array.isArray(body.images)
+  const rawImages = Array.isArray(body.images)
     ? body.images.map((img) => normalizeImageUrl(img)).filter(Boolean)
     : null;
 
@@ -86,10 +87,31 @@ export const PATCH = withErrorHandling(async (request, { params }) => {
     ...body
   };
 
-  if (normalizedImages) {
-    merged.images = normalizedImages;
+  let targetImages = null;
+  if (rawImages) {
+    targetImages = rawImages;
   } else if (imageFromBody) {
-    merged.images = [imageFromBody];
+    targetImages = [imageFromBody];
+  }
+
+  if (targetImages) {
+    const processedImages = [];
+    for (const img of targetImages) {
+      if (img.startsWith("data:image/")) {
+        try {
+          const uploaded = await uploadImage(img);
+          processedImages.push(uploaded.secureUrl);
+        } catch (err) {
+          return NextResponse.json(
+            { error: `Failed to upload image to Cloudinary: ${err.message}` },
+            { status: 400 }
+          );
+        }
+      } else {
+        processedImages.push(img);
+      }
+    }
+    merged.images = processedImages;
   }
 
   delete merged._id;

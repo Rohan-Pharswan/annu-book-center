@@ -6,6 +6,7 @@ import { withErrorHandling } from "@/lib/apiHandler";
 import Product from "@/models/Product";
 import Discount from "@/models/Discount";
 import { calculateDiscountedPrice, getBestDiscountForProduct } from "@/lib/pricing";
+import { uploadImage } from "@/lib/cloudinary";
 import mongoose from "mongoose";
 
 function normalizeImageUrl(value) {
@@ -78,15 +79,35 @@ export const POST = withErrorHandling(async (request) => {
 
   const body = await request.json();
   const imageFromBody = normalizeImageUrl(body.image);
-  const normalizedImages = Array.isArray(body.images) ? body.images.map((img) => normalizeImageUrl(img)).filter(Boolean) : [];
+  const rawImages = Array.isArray(body.images) ? body.images.map((img) => normalizeImageUrl(img)).filter(Boolean) : [];
 
-  body.images = normalizedImages.length > 0 ? normalizedImages : imageFromBody ? [imageFromBody] : [];
+  const initialImages = rawImages.length > 0 ? rawImages : imageFromBody ? [imageFromBody] : [];
 
-  if (body.images.length === 0) {
-    return NextResponse.json({ errors: ["Images must be an array"] }, { status: 400 });
+  if (initialImages.length === 0) {
+    return NextResponse.json({ errors: ["At least one product image is required"] }, { status: 400 });
   }
 
   delete body.image;
+
+  // Process any Base64 images through Cloudinary before persisting
+  const processedImages = [];
+  for (const img of initialImages) {
+    if (img.startsWith("data:image/")) {
+      try {
+        const uploaded = await uploadImage(img);
+        processedImages.push(uploaded.secureUrl);
+      } catch (err) {
+        return NextResponse.json(
+          { error: `Failed to upload image to Cloudinary: ${err.message}` },
+          { status: 400 }
+        );
+      }
+    } else {
+      processedImages.push(img);
+    }
+  }
+
+  body.images = processedImages;
 
   const parsed = validate(productSchema, body);
   if (!parsed.ok) return NextResponse.json({ errors: parsed.errors }, { status: 400 });
@@ -95,3 +116,4 @@ export const POST = withErrorHandling(async (request) => {
   const product = await Product.create(parsed.data);
   return NextResponse.json({ success: true, product }, { status: 201 });
 });
+
