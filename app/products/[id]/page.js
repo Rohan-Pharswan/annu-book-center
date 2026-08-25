@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatINR } from "@/lib/currency";
 import { useToast } from "@/components/ToastProvider";
@@ -16,8 +17,13 @@ export default function ProductDetailPage() {
     try {
       const res = await fetch(`/api/products/${params.id}`);
       const data = await res.json();
+      if (!res.ok || data.error || !data._id) {
+        setProduct({ notFound: true, error: data.error || "Product not found" });
+        return;
+      }
       setProduct(data);
     } catch {
+      setProduct({ notFound: true, error: "Failed to load product details" });
       toast.error("Failed to load product details");
     }
   }
@@ -94,6 +100,22 @@ export default function ProductDetailPage() {
           <div className="skeleton" style={{ height: "80px", width: "100%" }} />
           <div className="skeleton" style={{ height: "32px", width: "160px" }} />
           <div className="skeleton" style={{ height: "44px", width: "200px" }} />
+        </div>
+      </section>
+    );
+  }
+
+  if (product.notFound) {
+    return (
+      <section className="panel stack" style={{ textAlign: "center", padding: "48px 20px", margin: "20px 0" }}>
+        <h2>Product Not Found</h2>
+        <p className="muted" style={{ margin: "8px 0 16px" }}>
+          {product.error || "The product you are looking for does not exist or has been removed."}
+        </p>
+        <div>
+          <Link href="/products" className="btn-secondary" style={{ textDecoration: "none", display: "inline-block" }}>
+            &larr; Back to Products
+          </Link>
         </div>
       </section>
     );
@@ -209,17 +231,20 @@ export default function ProductDetailPage() {
         </form>
 
         <div className="stack">
-          {product.reviews?.map((item) => (
-            <div key={item._id} className="panel stack" style={{ padding: "16px" }}>
-              <div className="row between">
-                <strong>{item.userId?.name || "Customer"}</strong>
-                <span className="rating" aria-label={`Rated ${item.rating} out of 5`}>
-                  {"★".repeat(item.rating)}{"☆".repeat(5 - item.rating)}
-                </span>
+          {product.reviews?.map((item) => {
+            const r = Math.max(1, Math.min(5, Math.round(Number(item.rating) || 5)));
+            return (
+              <div key={item._id} className="panel stack" style={{ padding: "16px" }}>
+                <div className="row between">
+                  <strong>{item.userId?.name || "Customer"}</strong>
+                  <span className="rating" aria-label={`Rated ${r} out of 5`}>
+                    {"★".repeat(r)}{"☆".repeat(5 - r)}
+                  </span>
+                </div>
+                <p style={{ margin: 0 }}>{item.comment}</p>
               </div>
-              <p style={{ margin: 0 }}>{item.comment}</p>
-            </div>
-          ))}
+            );
+          })}
           {!product.reviews?.length && (
             <p className="muted">No reviews yet for this product. Be the first to leave a review!</p>
           )}
@@ -229,4 +254,5 @@ export default function ProductDetailPage() {
     </section>
   );
 }
+
 

@@ -72,7 +72,17 @@ const OrderSchema = new Schema(
       ],
       default: "Pending"
     },
-    paymentMethod: { type: String, default: "Cash on Delivery" }
+    paymentMethod: { type: String, default: "Cash on Delivery" },
+    // WhatsApp Admin Notification Tracking
+    whatsappAdminNotificationSent: { type: Boolean, default: false, index: true },
+    whatsappAdminNotificationSentAt: { type: Date, default: null },
+    whatsappAdminNotificationMessageId: { type: String, default: "" },
+    whatsappAdminNotificationStatus: {
+      type: String,
+      enum: ["not_configured", "pending", "sent", "failed"],
+      default: "pending"
+    },
+    whatsappAdminNotificationError: { type: String, default: "" }
   },
   { timestamps: true }
 );

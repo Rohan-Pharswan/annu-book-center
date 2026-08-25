@@ -9,6 +9,7 @@ import Order from "@/models/Order";
 import Discount from "@/models/Discount";
 import { calculateDiscountedPrice, DEFAULT_DELIVERY_CHARGE, getBestDiscountForProduct } from "@/lib/pricing";
 import Notification from "@/models/Notification";
+import { sendAdminWhatsAppOrderNotification } from "@/lib/whatsapp";
 
 // Per-user checkout lock: prevents the same user from placing two concurrent orders.
 // Set holds string userIds that are currently mid-checkout.
@@ -204,6 +205,13 @@ export const POST = withErrorHandling(async (request) => {
           totalAmount
         }
       });
+    }
+
+    // Safely trigger automated WhatsApp notification to admin (failures never break checkout)
+    try {
+      await sendAdminWhatsAppOrderNotification(order);
+    } catch (waErr) {
+      console.error("[Order Creation] Error triggering WhatsApp admin notification:", waErr?.message || waErr);
     }
 
     return NextResponse.json({ success: true, order }, { status: 201 });

@@ -1,6 +1,7 @@
 import "@/app/globals.css";
 import Navbar from "@/components/Navbar";
 import ToastProvider from "@/components/ToastProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: {
@@ -38,6 +39,7 @@ export default function RootLayout({ children }) {
           <Navbar />
           <main className="container">{children}</main>
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );
