@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
-  const [user, setUser] = useState(null);
+  const { user, setUser, checkAuth } = useAuth();
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -59,44 +60,21 @@ export default function Navbar() {
     }
   }, []);
 
-  const checkUser = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/me");
-      if (res.ok) {
-        const data = await res.json();
-        const currentUser = data?.user || null;
-        setUser(currentUser);
-
-        if (currentUser) {
-          loadCartCount();
-          loadWishlistCount();
-          if (currentUser.role === "admin") {
-            loadNotifications();
-          } else {
-            setUnreadNotifications(0);
-          }
-        } else {
-          setCartCount(0);
-          setWishlistCount(0);
-          setUnreadNotifications(0);
-        }
+  useEffect(() => {
+    if (user) {
+      loadCartCount();
+      loadWishlistCount();
+      if (user.role === "admin") {
+        loadNotifications();
       } else {
-        setUser(null);
-        setCartCount(0);
-        setWishlistCount(0);
         setUnreadNotifications(0);
       }
-    } catch {
-      setUser(null);
+    } else {
       setCartCount(0);
       setWishlistCount(0);
       setUnreadNotifications(0);
     }
-  }, [loadCartCount, loadWishlistCount, loadNotifications]);
-
-  useEffect(() => {
-    checkUser();
-  }, [pathname, checkUser]);
+  }, [user, loadCartCount, loadWishlistCount, loadNotifications]);
 
   // Close drawer on route change
   useEffect(() => {
@@ -137,7 +115,7 @@ export default function Navbar() {
       loadWishlistCount();
     }
     function handleAuthChange() {
-      checkUser();
+      checkAuth();
     }
 
     window.addEventListener("cart-updated", handleCartUpdate);
@@ -146,7 +124,7 @@ export default function Navbar() {
 
     function handleVisibility() {
       if (document.visibilityState === "visible") {
-        checkUser();
+        checkAuth();
       }
     }
     document.addEventListener("visibilitychange", handleVisibility);
@@ -164,7 +142,7 @@ export default function Navbar() {
       document.removeEventListener("visibilitychange", handleVisibility);
       clearInterval(interval);
     };
-  }, [loadCartCount, loadWishlistCount, checkUser, user?.role, loadNotifications]);
+  }, [loadCartCount, loadWishlistCount, checkAuth, user?.role, loadNotifications]);
 
   async function logout() {
     try {

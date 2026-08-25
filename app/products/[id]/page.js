@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatINR } from "@/lib/currency";
 import { useToast } from "@/components/ToastProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -12,6 +13,7 @@ export default function ProductDetailPage() {
   const [review, setReview] = useState({ rating: 5, comment: "" });
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const toast = useToast();
+  const { ensureAuthenticated } = useAuth();
 
   async function loadProduct() {
     try {
@@ -33,6 +35,10 @@ export default function ProductDetailPage() {
   }, [params?.id]);
 
   async function addToCart() {
+    // 1. Pre-check auth BEFORE calling /api/cart
+    const isAuthed = await ensureAuthenticated("cart");
+    if (!isAuthed) return;
+
     try {
       const res = await fetch("/api/cart", {
         method: "POST",
@@ -41,6 +47,10 @@ export default function ProductDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.error === "Unauthorized" || data.error === "Invalid session") {
+          ensureAuthenticated("cart");
+          return;
+        }
         toast.error(data.error || "Failed to add to cart");
         return;
       }
@@ -52,10 +62,18 @@ export default function ProductDetailPage() {
   }
 
   async function addToWishlist() {
+    // 1. Pre-check auth BEFORE calling /api/wishlist
+    const isAuthed = await ensureAuthenticated("wishlist");
+    if (!isAuthed) return;
+
     try {
       const res = await fetch(`/api/wishlist/${params.id}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.error === "Unauthorized" || data.error === "Invalid session") {
+          ensureAuthenticated("wishlist");
+          return;
+        }
         toast.error(data.error || "Failed to update wishlist");
         return;
       }
@@ -68,6 +86,10 @@ export default function ProductDetailPage() {
 
   async function submitReview(e) {
     e.preventDefault();
+    // 1. Pre-check auth BEFORE calling /api/products/[id]/reviews
+    const isAuthed = await ensureAuthenticated("review");
+    if (!isAuthed) return;
+
     setReviewSubmitting(true);
     try {
       const res = await fetch(`/api/products/${params.id}/reviews`, {
@@ -77,6 +99,10 @@ export default function ProductDetailPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.error === "Unauthorized" || data.error === "Invalid session") {
+          ensureAuthenticated("review");
+          return;
+        }
         toast.error(data.error || "Failed to submit review");
         return;
       }

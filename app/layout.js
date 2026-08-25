@@ -1,6 +1,8 @@
 import "@/app/globals.css";
 import Navbar from "@/components/Navbar";
 import ToastProvider from "@/components/ToastProvider";
+import AuthProvider from "@/components/AuthProvider";
+import AuthModal from "@/components/AuthModal";
 import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
@@ -35,10 +37,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <ToastProvider>
-          <Navbar />
-          <main className="container">{children}</main>
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <Navbar />
+            <AuthModal />
+            <main className="container">{children}</main>
+          </ToastProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

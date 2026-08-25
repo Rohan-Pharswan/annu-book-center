@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") || "/";
   const toast = useToast();
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -30,7 +32,7 @@ export default function SignupPage() {
       }
       toast.success("Account created! Welcome to Annu Book Store.");
       window.dispatchEvent(new CustomEvent("auth-changed"));
-      router.push("/");
+      router.push(redirect.startsWith("/") ? redirect : `/${redirect}`);
       router.refresh();
     } catch {
       setError("An unexpected error occurred");
@@ -40,6 +42,7 @@ export default function SignupPage() {
     }
   }
 
+  const loginLink = redirect && redirect !== "/" ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login";
 
   return (
     <section className="auth-wrap stack">
@@ -103,12 +106,21 @@ export default function SignupPage() {
 
       <p className="muted" style={{ textAlign: "center", fontSize: "0.9rem" }}>
         Already have an account?{" "}
-        <a href="/login" style={{ color: "var(--primary)", fontWeight: 600 }}>
+        <a href={loginLink} style={{ color: "var(--primary)", fontWeight: 600 }}>
           Sign In
         </a>
       </p>
     </section>
   );
 }
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="auth-wrap stack"><p className="muted" style={{ textAlign: "center" }}>Loading...</p></div>}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
 
 

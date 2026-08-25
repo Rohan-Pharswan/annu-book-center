@@ -5,11 +5,13 @@ import AuthGate from "@/components/AuthGate";
 import Link from "next/link";
 import { formatINR } from "@/lib/currency";
 import { useToast } from "@/components/ToastProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function WishlistPage() {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+  const { ensureAuthenticated } = useAuth();
 
   async function loadWishlist() {
     try {
@@ -43,6 +45,10 @@ export default function WishlistPage() {
   }
 
   async function addToCart(productId) {
+    // 1. Pre-check auth BEFORE calling /api/cart
+    const isAuthed = await ensureAuthenticated("cart");
+    if (!isAuthed) return;
+
     try {
       const res = await fetch("/api/cart", {
         method: "POST",
@@ -51,6 +57,10 @@ export default function WishlistPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.error === "Unauthorized" || data.error === "Invalid session") {
+          ensureAuthenticated("cart");
+          return;
+        }
         toast.error(data.error || "Failed to add to cart");
         return;
       }

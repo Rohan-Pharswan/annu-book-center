@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import { useToast } from "@/components/ToastProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function ProductsCatalogPage() {
   const [items, setItems] = useState([]);
@@ -14,6 +15,7 @@ export default function ProductsCatalogPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
+  const { ensureAuthenticated } = useAuth();
 
   async function loadCategories() {
     try {
@@ -57,6 +59,10 @@ export default function ProductsCatalogPage() {
   }, [q, category, page]);
 
   async function addToCart(productId) {
+    // 1. Pre-check auth BEFORE calling /api/cart
+    const isAuthed = await ensureAuthenticated("cart");
+    if (!isAuthed) return;
+
     try {
       const res = await fetch("/api/cart", {
         method: "POST",
@@ -65,6 +71,10 @@ export default function ProductsCatalogPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.error === "Unauthorized" || data.error === "Invalid session") {
+          ensureAuthenticated("cart");
+          return;
+        }
         toast.error(data.error || "Failed to add to cart");
         return;
       }
@@ -76,10 +86,18 @@ export default function ProductsCatalogPage() {
   }
 
   async function addToWishlist(productId) {
+    // 1. Pre-check auth BEFORE calling /api/wishlist
+    const isAuthed = await ensureAuthenticated("wishlist");
+    if (!isAuthed) return;
+
     try {
       const res = await fetch(`/api/wishlist/${productId}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.error === "Unauthorized" || data.error === "Invalid session") {
+          ensureAuthenticated("wishlist");
+          return;
+        }
         toast.error(data.error || "Failed to update wishlist");
         return;
       }

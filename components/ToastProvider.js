@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { triggerAuthModal } from "@/components/AuthModal";
 
 const ToastContext = createContext(null);
 
@@ -38,6 +39,17 @@ export default function ToastProvider({ children }) {
 
   const show = useCallback(
     (message, type = "info", duration = 3500) => {
+      // Intercept any unhandled auth error messages and open the login popup instead
+      const msgLower = String(message || "").toLowerCase().trim();
+      if (
+        msgLower === "unauthorized" ||
+        msgLower === "invalid session" ||
+        msgLower === "invalid token"
+      ) {
+        triggerAuthModal({ action: "cart" });
+        return null;
+      }
+
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       const newToast = { id, message, type, duration };
 
