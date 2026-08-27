@@ -7,6 +7,7 @@ import Order from "@/models/Order";
 import Product from "@/models/Product";
 import User from "@/models/User";
 import Notification from "@/models/Notification";
+import { sendCustomerOrderStatusEmail } from "@/lib/email";
 
 
 const ALLOWED = [
@@ -97,6 +98,30 @@ export const PATCH = withErrorHandling(async (request, { params }) => {
       status
     }
   });
+
+  // Map customer-facing status events:
+  // 1. Confirmed -> "confirmed"
+  // 2. Delivered / Picked Up -> "completed"
+  // 3. Cancelled -> "cancelled"
+  let customerEventKey = null;
+  if (status === "Confirmed") {
+    customerEventKey = "confirmed";
+  } else if (status === "Delivered" || status === "Picked Up") {
+    customerEventKey = "completed";
+  } else if (status === "Cancelled") {
+    customerEventKey = "cancelled";
+  }
+
+  if (customerEventKey) {
+    try {
+      await sendCustomerOrderStatusEmail(updatedOrder, customerEventKey);
+    } catch (statusEmailErr) {
+      console.error(
+        `[Admin Status Update] Error sending customer "${customerEventKey}" email for order ${String(order._id).slice(-6)}:`,
+        statusEmailErr?.message || statusEmailErr
+      );
+    }
+  }
 
   return NextResponse.json({ success: true, order: updatedOrder });
 });

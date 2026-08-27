@@ -92,7 +92,23 @@ const OrderSchema = new Schema(
       enum: ["not_configured", "pending", "in_progress", "sent", "failed"],
       default: "pending"
     },
-    confirmationEmailError: { type: String, default: "" }
+    confirmationEmailError: { type: String, default: "" },
+    // Customer Status Transition Email History Tracking
+    statusEmailHistory: [
+      {
+        eventKey: { type: String, required: true },
+        eventLabel: { type: String, required: true },
+        sent: { type: Boolean, default: false },
+        sentAt: { type: Date, default: null },
+        messageId: { type: String, default: "" },
+        status: {
+          type: String,
+          enum: ["not_configured", "pending", "in_progress", "sent", "failed"],
+          default: "pending"
+        },
+        error: { type: String, default: "" }
+      }
+    ]
   },
   { timestamps: true }
 );
