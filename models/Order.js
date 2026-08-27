@@ -82,7 +82,17 @@ const OrderSchema = new Schema(
       enum: ["not_configured", "pending", "sent", "failed"],
       default: "pending"
     },
-    whatsappAdminNotificationError: { type: String, default: "" }
+    whatsappAdminNotificationError: { type: String, default: "" },
+    // Customer Order Confirmation Email Tracking
+    confirmationEmailSent: { type: Boolean, default: false, index: true },
+    confirmationEmailSentAt: { type: Date, default: null },
+    confirmationEmailMessageId: { type: String, default: "" },
+    confirmationEmailStatus: {
+      type: String,
+      enum: ["not_configured", "pending", "in_progress", "sent", "failed"],
+      default: "pending"
+    },
+    confirmationEmailError: { type: String, default: "" }
   },
   { timestamps: true }
 );

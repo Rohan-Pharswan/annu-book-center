@@ -89,7 +89,12 @@ export default function OrdersPage() {
               const isPendingDeliveryFee = isHomeDelivery && deliveryChargeStatus === "pending";
 
               return (
-                <div key={order._id} className="panel" style={{ borderLeft: isPendingDeliveryFee ? "4px solid #f59e0b" : "1px solid var(--border)" }}>
+                <div
+                  key={order._id}
+                  id={`order-${order._id}`}
+                  className="panel"
+                  style={{ borderLeft: isPendingDeliveryFee ? "4px solid #f59e0b" : "1px solid var(--border)" }}
+                >
                   <div className="row between">
                     <strong>Order #{order._id.slice(-6)}</strong>
                     <span className={statusClass}>
