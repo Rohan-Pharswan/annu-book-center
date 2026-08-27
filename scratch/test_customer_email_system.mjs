@@ -5,20 +5,20 @@ import {
   getCustomerOrderUrl,
   generateOrderConfirmationEmailHtml,
   generateOrderConfirmationEmailText,
-  sendCustomerOrderConfirmationEmail
+  createMailTransporter
 } from "../lib/email.js";
-import Order from "../models/Order.js";
 
 async function runTests() {
   console.log("==================================================");
-  console.log("🧪 STARTING CUSTOMER EMAIL SYSTEM UNIT TESTS");
+  console.log("🧪 STARTING GMAIL SMTP CUSTOMER EMAIL UNIT TESTS");
   console.log("==================================================");
 
-  // Test 1: Config loading
+  // Test 1: Config loading defaults
   console.log("\n[Test 1] Testing getEmailConfig defaults...");
   const config = getEmailConfig();
-  assert.strictEqual(typeof config.apiKey, "string");
+  assert.strictEqual(config.gmailUser, "ordersannubookcenter@gmail.com");
   assert.strictEqual(config.replyTo, "ordersannubookcenter@gmail.com");
+  assert.strictEqual(config.from, "Annu Book Center <ordersannubookcenter@gmail.com>");
   assert.ok(config.baseUrl.includes("http"));
   console.log("✅ getEmailConfig passed!");
 
@@ -130,6 +130,17 @@ async function runTests() {
   assert.ok(textOutput.includes("Rohan Pharswan"));
   assert.ok(textOutput.includes(`orders#order-${dummyId}`));
   console.log("✅ Plain text generation passed!");
+
+  // Test 6: Transporter factory
+  console.log("\n[Test 6] Testing Transporter Factory creation...");
+  const mockConfig = {
+    gmailUser: "ordersannubookcenter@gmail.com",
+    gmailPassword: "mock_password"
+  };
+  const transporter = createMailTransporter(mockConfig);
+  assert.ok(transporter, "Transporter must be created");
+  assert.strictEqual(typeof transporter.sendMail, "function");
+  console.log("✅ Nodemailer transporter initialized successfully!");
 
   console.log("\n==================================================");
   console.log("🎉 ALL TEMPLATE & LOGIC UNIT TESTS PASSED!");

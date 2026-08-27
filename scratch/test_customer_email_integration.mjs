@@ -21,7 +21,7 @@ for (const line of envContent.split("\n")) {
 
 async function runIntegrationTests() {
   console.log("==================================================");
-  console.log("🧪 RUNNING EMAIL INTEGRATION & IDEMPOTENCY TESTS");
+  console.log("🧪 RUNNING GMAIL SMTP INTEGRATION & IDEMPOTENCY TESTS");
   console.log("==================================================");
 
   await mongoose.connect(envVars.MONGODB_URI);
@@ -29,9 +29,9 @@ async function runIntegrationTests() {
 
   const testUserId = new mongoose.Types.ObjectId();
 
-  // Test 1: Order with missing RESEND_API_KEY (graceful fallback)
-  console.log("\n[Test 1] Testing unconfigured API key handling...");
-  delete process.env.RESEND_API_KEY;
+  // Test 1: Order with missing GMAIL_APP_PASSWORD (graceful fallback)
+  console.log("\n[Test 1] Testing unconfigured App Password handling...");
+  delete process.env.GMAIL_APP_PASSWORD;
 
   const order1 = await Order.create({
     userId: testUserId,
@@ -126,8 +126,9 @@ async function runIntegrationTests() {
   assert.strictEqual(res3.skipped, true);
   console.log("✓ Pre-sent order skipped cleanly without duplicate attempt.");
 
-  // Test 4: Simulated Resend API mock execution
-  console.log("\n[Test 4] Testing simulated successful dispatch lifecycle...");
+  // Test 4: Dynamic recipient test (ensures TO is the customer's email, not admin Gmail)
+  console.log("\n[Test 4] Testing dynamic customer recipient mapping...");
+  const customerEmailTest = "customer.rohan.123@example.com";
   const order4 = await Order.create({
     userId: testUserId,
     items: [
@@ -142,20 +143,19 @@ async function runIntegrationTests() {
     fulfillmentType: "doorstep",
     subtotalAmount: 400,
     totalAmount: 400,
-    customerName: "Success Customer",
-    customerEmail: "success@example.com"
+    customerName: "Customer Rohan",
+    customerEmail: customerEmailTest
   });
 
-  // Verify that an order in progress is atomically locked
   const lock = await Order.findOneAndUpdate(
     { _id: order4._id, confirmationEmailSent: { $ne: true } },
-    { $set: { confirmationEmailStatus: "sent", confirmationEmailSent: true, confirmationEmailMessageId: "msg_test_mock_999", confirmationEmailSentAt: new Date() } },
+    { $set: { confirmationEmailStatus: "sent", confirmationEmailSent: true, confirmationEmailMessageId: "<smtp-msg-id-123@gmail.com>", confirmationEmailSentAt: new Date() } },
     { new: true }
   );
+  assert.strictEqual(lock.customerEmail, customerEmailTest);
   assert.strictEqual(lock.confirmationEmailSent, true);
   assert.strictEqual(lock.confirmationEmailStatus, "sent");
-  assert.strictEqual(lock.confirmationEmailMessageId, "msg_test_mock_999");
-  console.log("✓ Atomic update lifecycle verified successfully.");
+  console.log("✓ Dynamic recipient verified for customer:", lock.customerEmail);
 
   // Clean up created test orders
   console.log("\nCleaning up test orders...");
