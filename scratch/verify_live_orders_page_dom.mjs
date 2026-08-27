@@ -41,15 +41,18 @@ async function verifyLiveDom() {
   const addressId = addrData.user?.addresses?.[0]?._id;
 
   // 3. Add to cart & place order
-  const prodRes = await fetch(`${BASE_URL}/api/products?page=1&limit=1`);
+  const prodRes = await fetch(`${BASE_URL}/api/products?page=1&limit=20`);
   const prodData = await prodRes.json();
-  const prod = prodData.items?.[0];
+  const prodList = prodData.products || prodData.items || [];
+  const prod = prodList.find(p => Number(p.stock) > 0) || prodList[0];
+  if (!prod) throw new Error(`No products returned from live API: ${JSON.stringify(prodData)}`);
 
-  await fetch(`${BASE_URL}/api/cart`, {
+  const cartRes = await fetch(`${BASE_URL}/api/cart`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Cookie: cookieHeader },
-    body: JSON.stringify({ productId: prod._id, quantity: 2 })
+    body: JSON.stringify({ productId: prod._id, quantity: 1 })
   });
+  if (!cartRes.ok) throw new Error(`Failed to add to cart: ${await cartRes.text()}`);
 
   const orderRes = await fetch(`${BASE_URL}/api/orders`, {
     method: "POST",
@@ -57,6 +60,7 @@ async function verifyLiveDom() {
     body: JSON.stringify({ fulfillmentType: "doorstep", addressId })
   });
   const orderData = await orderRes.json();
+  if (!orderRes.ok) throw new Error(`Failed to place order: ${JSON.stringify(orderData)}`);
   const order = orderData.order;
   console.log(`Placed live test Home Delivery order #${String(order._id).slice(-6)}`);
 
